@@ -1,4 +1,4 @@
-FROM python:3.11.0b3-slim
+FROM python:slim-bookworm
 
 COPY jwlib /jwlib
 COPY jwb-index /jwb-index
