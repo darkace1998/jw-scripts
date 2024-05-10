@@ -1,4 +1,4 @@
-FROM python:3.11.0b3-slim
+FROM python:3.13.0b1-slim
 
 COPY jwlib /jwlib
 COPY jwb-index /jwb-index
