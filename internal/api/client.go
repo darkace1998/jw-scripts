@@ -278,9 +278,9 @@ func formatFilename(s string, safe bool) string {
 	if safe {
 		s = strings.ReplaceAll(s, `"`, "'")
 		s = strings.ReplaceAll(s, ":", ".")
-		forbidden = "<>|?\\*/\\0\n"
+		forbidden = "<>|?\\*/\x00\n"
 	} else {
-		forbidden = "/\\0"
+		forbidden = "/\x00"
 	}
 	return strings.Map(func(r rune) rune {
 		if strings.ContainsRune(forbidden, r) {
