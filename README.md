@@ -1,4 +1,4 @@
-# JW scripts
+# JW Scripts (Go Version)
 
 *These methods of acessing jw.org are, while legal, not officially supported by the organisation. Use them if you find it worth the time, pain and risk. But first, please take the time to read [w18.04 30-31](https://wol.jw.org/en/wol/d/r1/lp-e/2018364). Then consider buing a device which has official support for JW Broadcasting app. Like a Roku, Apple TV or Amazon Fire TV. It will give you a better and safer experience.*
 
@@ -8,15 +8,33 @@ With these scripts you can get the latest JW Broadcasting videos automatically d
 
 ## Get started
 
-> From time to time the master branch may have untested features. You may have better luck finding a "stable" version under the [releases](https://github.com/allejok96/jw-scripts/releases) page.
+This project is now written in Go. You will need to have Go installed on your system to build and run the applications.
 
-Take a look at [installation methods](https://github.com/allejok96/jw-scripts/wiki/Installation) to get up and running.
+### Building the project
+
+To build the `jwb-index` and `jwb-offline` executables, run the following command from the root of the project:
+
+```bash
+go build -o bin/ ./...
+```
+
+This will create the executables in a `bin` directory.
+
+### Running the applications
 
 For example, to download the latest videos in Swedish, you would run:
 
-    jwb-index --download --latest --lang=Z
+```bash
+./bin/jwb-index --download --latest --lang=Z
+```
 
-Next, check out the [Wiki pages](https://github.com/allejok96/jw-scripts/wiki) for more examples and options.
+To play downloaded videos, you can use the `jwb-offline` command:
+
+```bash
+./bin/jwb-offline /path/to/your/videos
+```
+
+Next, check out the [Wiki pages](https://github.com/allejok96/jw-scripts/wiki) for more examples and options. The command-line flags are the same as the original Python version.
 
 ## Questions
 
