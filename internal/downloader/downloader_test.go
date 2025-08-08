@@ -87,7 +87,7 @@ func TestThrottledReader(t *testing.T) {
 					tt.rateLimit, actualRate, efficiency)
 			} else {
 				// For unlimited, just check it completed quickly
-				if elapsed > 100*time.Millisecond {
+				if elapsed > unlimitedRateMaxDuration {
 					t.Errorf("Unlimited rate took too long: %v", elapsed)
 				}
 				t.Logf("Unlimited rate test passed: completed in %v", elapsed)
