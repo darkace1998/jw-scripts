@@ -44,7 +44,9 @@ Yes, I'm keeping an add-on alive [here](https://github.com/allejok96/plugin.vide
 
 #### Why is the video download so slow?
 
-It seems to be realated to the `--limit-rate` flag ([why?](https://github.com/allejok96/jw-scripts/wiki/How-it-works#batch-downloading)). 
+~~It seems to be realated to the `--limit-rate` flag ([why?](https://github.com/allejok96/jw-scripts/wiki/How-it-works#batch-downloading)).~~ 
+
+**Fixed!** The rate limiting implementation has been improved to provide smooth downloads at the specified rate limits without the previous throttling issues.
 
 *But please, somebody think of the servers!* :-)
 

@@ -347,25 +347,37 @@ func fileExists(path string) bool {
 
 // throttledReader is a reader that is throttled to a certain rate.
 type throttledReader struct {
-	r    io.Reader
-	t    *time.Ticker
-	buf  []byte
-	last time.Time
+	r         io.Reader
+	rateLimit float64 // bytes per second
+	startTime time.Time
+	totalRead int64
 }
 
 func newThrottledReader(r io.Reader, rateLimit float64) *throttledReader {
 	return &throttledReader{
-		r:    r,
-		t:    time.NewTicker(time.Second),
-		buf:  make([]byte, int(rateLimit*1024*1024)),
-		last: time.Now(),
+		r:         r,
+		rateLimit: rateLimit * 1024 * 1024, // Convert MB/s to bytes/s
+		startTime: time.Now(),
 	}
 }
 
 func (r *throttledReader) Read(p []byte) (n int, err error) {
-	<-r.t.C
-	if len(p) > len(r.buf) {
-		p = p[:len(r.buf)]
+	n, err = r.r.Read(p)
+	if err != nil || n == 0 || r.rateLimit <= 0 {
+		return n, err
 	}
-	return r.r.Read(p)
+
+	r.totalRead += int64(n)
+	elapsed := time.Since(r.startTime).Seconds()
+
+	// Calculate expected time for the data read so far
+	expectedTime := float64(r.totalRead) / r.rateLimit
+	
+	// If we're reading too fast, sleep
+	if elapsed < expectedTime {
+		sleepTime := time.Duration((expectedTime - elapsed) * float64(time.Second))
+		time.Sleep(sleepTime)
+	}
+
+	return n, err
 }
