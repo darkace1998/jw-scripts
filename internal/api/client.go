@@ -41,7 +41,7 @@ func (c *Client) GetLanguages() ([]Language, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get languages: %s", resp.Status)
@@ -62,7 +62,7 @@ func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get category %s: %s", key, resp.Status)
@@ -227,7 +227,7 @@ func getBestVideo(files []File, quality int, subtitles bool) *File {
 }
 
 func parseDate(dateString string) (time.Time, error) {
-	re := regexp.MustCompile(`\.[0-9]+Z$`)
+	re := regexp.MustCompile(`\.\d+Z$`)
 	dateString = re.ReplaceAllString(dateString, "")
 	return time.Parse("2006-01-02T15:04:05", dateString)
 }

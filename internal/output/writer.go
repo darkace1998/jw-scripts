@@ -30,7 +30,6 @@ type Writer interface {
 // CreateOutput creates the output based on the settings.
 func CreateOutput(s *config.Settings, data []*api.Category) error {
 	if s.Mode == "filesystem" {
-		// cleanSymlinks(s)
 		return outputFilesystem(s, data)
 	}
 
@@ -101,7 +100,7 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 
 	for _, category := range data {
 		catDir := filepath.Join(dataDir, category.Key)
-		if err := os.MkdirAll(catDir, 0750); err != nil {
+		if err := os.MkdirAll(catDir, 0o750); err != nil {
 			return err
 		}
 
@@ -122,7 +121,7 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 			switch v := item.(type) {
 			case *api.Category:
 				linkDest := filepath.Join(dataDir, v.Key)
-				if err := os.MkdirAll(linkDest, 0750); err != nil {
+				if err := os.MkdirAll(linkDest, 0o750); err != nil {
 					return err
 				}
 				linkFile := filepath.Join(catDir, v.Name)
@@ -179,6 +178,7 @@ func fileExists(path string) bool {
 
 // --- TxtWriter ---
 
+// TxtWriter handles writing playlist entries to a text file
 type TxtWriter struct {
 	s         *config.Settings
 	file      *os.File
@@ -189,6 +189,7 @@ type TxtWriter struct {
 	formatter func(PlaylistEntry) string
 }
 
+// NewTxtWriter creates a new TxtWriter instance for writing playlist entries to a text file
 func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	filename := s.OutputFilename
 	if filename == "" {
@@ -210,6 +211,7 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	}, nil
 }
 
+// Add adds a playlist entry to the writer's queue
 func (w *TxtWriter) Add(entry PlaylistEntry) {
 	if !w.history[entry.Source] {
 		w.queue = append(w.queue, entry)
@@ -217,8 +219,9 @@ func (w *TxtWriter) Add(entry PlaylistEntry) {
 	}
 }
 
+// Dump writes all queued playlist entries to the output file
 func (w *TxtWriter) Dump() error {
-	defer w.file.Close()
+	defer func() { _ = w.file.Close() }()
 	if _, err := w.file.WriteString(w.start); err != nil {
 		return err
 	}
@@ -237,6 +240,7 @@ func (w *TxtWriter) Dump() error {
 
 // --- M3uWriter ---
 
+// NewM3uWriter creates a new TxtWriter configured for M3U playlist format
 func NewM3uWriter(s *config.Settings) (*TxtWriter, error) {
 	w, err := NewTxtWriter(s)
 	if err != nil {
@@ -251,6 +255,7 @@ func NewM3uWriter(s *config.Settings) (*TxtWriter, error) {
 
 // --- HtmlWriter ---
 
+// NewHTMLWriter creates a new TxtWriter configured for HTML format
 func NewHTMLWriter(s *config.Settings) (*TxtWriter, error) {
 	w, err := NewTxtWriter(s)
 	if err != nil {
@@ -259,26 +264,30 @@ func NewHTMLWriter(s *config.Settings) (*TxtWriter, error) {
 	w.start = "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"/></head><body>\n"
 	w.end = "</body></html>\n"
 	w.formatter = func(e PlaylistEntry) string {
-		return fmt.Sprintf("<a href=\"%s\">%s</a><br>", html.EscapeString(e.Source), html.EscapeString(e.Name))
+		return fmt.Sprintf("<a href=%q>%s</a><br>", html.EscapeString(e.Source), html.EscapeString(e.Name))
 	}
 	return w, nil
 }
 
 // --- StdoutWriter ---
 
+// StdoutWriter handles writing playlist entries to standard output
 type StdoutWriter struct {
 	s     *config.Settings
 	queue []PlaylistEntry
 }
 
+// NewStdoutWriter creates a new StdoutWriter instance for writing playlist entries to stdout
 func NewStdoutWriter(s *config.Settings) *StdoutWriter {
 	return &StdoutWriter{s: s}
 }
 
+// Add adds a playlist entry to the writer's queue
 func (w *StdoutWriter) Add(entry PlaylistEntry) {
 	w.queue = append(w.queue, entry)
 }
 
+// Dump writes all queued playlist entries to standard output
 func (w *StdoutWriter) Dump() error {
 	for _, entry := range w.queue {
 		fmt.Println(entry.Source)
@@ -288,19 +297,23 @@ func (w *StdoutWriter) Dump() error {
 
 // --- CommandWriter ---
 
+// CommandWriter handles executing commands for playlist entries
 type CommandWriter struct {
 	s     *config.Settings
 	queue []PlaylistEntry
 }
 
+// NewCommandWriter creates a new CommandWriter instance for executing commands on playlist entries
 func NewCommandWriter(s *config.Settings) *CommandWriter {
 	return &CommandWriter{s: s}
 }
 
+// Add adds a playlist entry to the writer's queue
 func (w *CommandWriter) Add(entry PlaylistEntry) {
 	w.queue = append(w.queue, entry)
 }
 
+// Dump executes the configured command for all queued playlist entries
 func (w *CommandWriter) Dump() error {
 	if len(w.queue) == 0 {
 		return nil

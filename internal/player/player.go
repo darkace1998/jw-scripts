@@ -112,7 +112,7 @@ func (m *VideoManager) writeDump() error {
 		return err
 	}
 
-	return os.WriteFile(m.dumpFile, data, 0600)
+	return os.WriteFile(m.dumpFile, data, 0o600)
 }
 
 func (m *VideoManager) setRandomVideo() bool {
@@ -126,7 +126,6 @@ func (m *VideoManager) setRandomVideo() bool {
 		return false
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
 
 	for _, vid := range files {
