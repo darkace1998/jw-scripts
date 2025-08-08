@@ -1,7 +1,7 @@
 package downloader
 
 import (
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 - MD5 used for file integrity verification, not cryptographic security
 	"errors"
 	"fmt"
 	"io"
@@ -218,8 +218,10 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 
 	var out *os.File
 	if resume {
+		// #nosec G304 - Path is from download logic for legitimate file operations
 		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
 	} else {
+		// #nosec G304 - Path is from download logic for legitimate file operations  
 		out, err = os.Create(path)
 	}
 	if err != nil {
@@ -241,7 +243,10 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 		progressbar.OptionSpinnerType(14),
 		progressbar.OptionFullWidth(),
 	)
-	_ = bar.Add64(start)
+	if err := bar.Add64(start); err != nil {
+		// Log error but continue - progress bar errors shouldn't stop download
+		fmt.Fprintf(os.Stderr, "Progress bar error: %v\n", err)
+	}
 
 	var body io.Reader = resp.Body
 	if rateLimit > 0 {
@@ -253,14 +258,17 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 }
 
 // CheckMD5 calculates the MD5 checksum of a file and compares it to the expected checksum.
+// Note: MD5 is used here for file integrity verification (not cryptographic security)
+// as it matches the checksum format provided by the external API.
 func CheckMD5(path, expectedMD5 string) (bool, error) {
+	// #nosec G304 - Path is for file checksum verification in download process
 	f, err := os.Open(path)
 	if err != nil {
 		return false, err
 	}
 	defer func() { _ = f.Close() }()
 
-	h := md5.New()
+	h := md5.New() // #nosec G401 - MD5 used for file integrity verification, not cryptographic security
 	if _, err := io.Copy(h, f); err != nil {
 		return false, err
 	}
@@ -284,6 +292,10 @@ func diskCleanup(s *config.Settings, directory string, referenceMedia *api.Media
 		}
 
 		needed := referenceMedia.Size + s.KeepFree
+		if needed < 0 {
+			// Overflow or negative values - skip the check
+			break
+		}
 		if free > uint64(needed) {
 			break
 		}
