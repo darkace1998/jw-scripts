@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/allejok96/jwb-go/internal/api"
 	"github.com/allejok96/jwb-go/internal/config"
@@ -44,7 +45,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
 	rootCmd.Flags().BoolVar(&settings.Latest, "latest", false, "index the \"Latest Videos\" category only")
-	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 1.0, "maximum download rate, in megabytes/s")
+	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.PrintCategory, "list-categories", "C", "", "print a list of (sub) category names")
 	rootCmd.Flags().StringVarP(&settings.Mode, "mode", "m", "", "output mode (filesystem, html, m3u, run, stdout, txt)")
 	rootCmd.Flags().BoolVar(&settings.Warning, "no-warning", true, "do not warn when space limit seems wrong")
@@ -95,7 +96,12 @@ func run(s *config.Settings) error {
 	}
 
 	if s.Latest {
-		// TODO: Implement latest logic
+		// Set MinDate to 14 days ago when --latest flag is used
+		fourteenDaysAgo := time.Now().AddDate(0, 0, -14)
+		s.MinDate = fourteenDaysAgo.Unix()
+		if s.Quiet < 1 {
+			fmt.Fprintf(os.Stderr, "filtering to latest videos since: %s\n", fourteenDaysAgo.Format("2006-01-02"))
+		}
 	}
 
 	if s.Mode == "run" {
