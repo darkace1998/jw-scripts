@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"syscall"
 	"time"
 
 	"github.com/allejok96/jwb-go/internal/api"
@@ -339,14 +338,6 @@ func getOldestMP4(directory string) (os.FileInfo, error) {
 	}
 
 	return oldest, nil
-}
-
-func getFreeDiskSpace(path string) (uint64, error) {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return 0, err
-	}
-	return stat.Bavail * uint64(stat.Bsize), nil
 }
 
 func fileExists(path string) bool {
