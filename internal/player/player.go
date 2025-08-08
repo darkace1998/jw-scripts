@@ -76,7 +76,7 @@ func (m *VideoManager) Run() error {
 }
 
 func (m *VideoManager) readDump() error {
-	data, err := ioutil.ReadFile(m.dumpFile)
+	data, err := os.ReadFile(m.dumpFile)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (m *VideoManager) writeDump() error {
 		return err
 	}
 
-	return ioutil.WriteFile(m.dumpFile, data, 0644)
+	return os.WriteFile(m.dumpFile, data, 0644)
 }
 
 func (m *VideoManager) setRandomVideo() bool {
@@ -200,7 +200,7 @@ func (m *VideoManager) addToHistory(video string) {
 
 func (m *VideoManager) listVideos() ([]string, error) {
 	var videos []string
-	files, err := ioutil.ReadDir(m.wd)
+	files, err := os.ReadDir(m.wd)
 	if err != nil {
 		return nil, err
 	}

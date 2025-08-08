@@ -314,16 +314,22 @@ func diskCleanup(s *config.Settings, directory string, referenceMedia *api.Media
 }
 
 func getOldestMP4(directory string) (os.FileInfo, error) {
-	files, err := ioutil.ReadDir(directory)
+	files, err := os.ReadDir(directory)
 	if err != nil {
 		return nil, err
 	}
 
 	var oldest os.FileInfo
+	var oldestModTime time.Time
 	for _, file := range files {
 		if !file.IsDir() && filepath.Ext(file.Name()) == ".mp4" {
-			if oldest == nil || file.ModTime().Before(oldest.ModTime()) {
-				oldest = file
+			info, err := file.Info()
+			if err != nil {
+				continue
+			}
+			if oldest == nil || info.ModTime().Before(oldestModTime) {
+				oldest = info
+				oldestModTime = info.ModTime()
 			}
 		}
 	}
