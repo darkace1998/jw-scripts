@@ -118,7 +118,7 @@ func TestThrottledReaderZeroRateLimit(t *testing.T) {
 	}
 
 	// Should be very fast with no rate limit
-	if elapsed > 10*time.Millisecond {
+	if elapsed > zeroRateLimitMaxDuration {
 		t.Errorf("Read with no rate limit took too long: %v", elapsed)
 	}
 }
