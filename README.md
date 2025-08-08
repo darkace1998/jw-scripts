@@ -8,7 +8,24 @@ With these scripts you can get the latest JW Broadcasting videos automatically d
 
 ## Get started
 
-This project is now written in Go. You will need to have Go installed on your system to build and run the applications.
+This project is now written in Go. You have two options to get started:
+
+### Option 1: Download Pre-built Binaries (Recommended)
+
+Pre-built binaries are available for multiple platforms from the [Releases page](https://github.com/darkace1998/jw-scripts/releases/latest):
+
+- **Linux** (amd64, arm64)
+- **Windows** (amd64, arm64) 
+- **macOS** (Intel, Apple Silicon)
+
+Simply download the appropriate binary for your platform and make it executable (Linux/macOS):
+```bash
+chmod +x jwb-index-linux-amd64 jwb-offline-linux-amd64
+```
+
+### Option 2: Building from Source
+
+If you prefer to build from source, you will need to have Go installed on your system.
 
 ### Building the project
 
@@ -63,6 +80,29 @@ Yes. The [Terms of Service](http://www.jw.org/en/terms-of-use/) allows:
 > distribution of free, non-commercial applications designed to download electronic files (for example, EPUB, PDF, MP3, AAC, MOBI, and MP4 files) from public areas of this site.
 
 I've also been in contact with the Scandinavian branch office, and they have confirmed that using software like this is legal according to the ToS.
+
+___
+
+## Development and Contributing
+
+This project uses GitHub Actions for automated testing and releases:
+
+- **Continuous Integration**: Automatic testing on multiple Go versions, linting, and security scanning
+- **Automated Releases**: Cross-platform binaries are automatically built and released when tags are pushed
+- **Code Quality**: Enforced code formatting, linting, and test coverage
+
+To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+### Creating a Release
+
+To create a new release with pre-built binaries:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This will automatically build binaries for all supported platforms and create a GitHub release.
 
 ___
 
