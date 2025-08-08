@@ -20,7 +20,11 @@ linters:
 
 linters-settings:
   revive:
-    min-confidence: 0.8
+        severity: warning
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
   gosec:
     excludes:
       - G104 # Audit errors not checked
