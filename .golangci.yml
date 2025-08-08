@@ -28,6 +28,11 @@ linters-settings:
   gosec:
     excludes:
       - G104 # Audit errors not checked
+      - G204 # Subprocess launched with potentially tainted input - intentional functionality
+      - G304 # Potential file inclusion via variable - intentional functionality  
+      - G401 # Use of weak cryptographic primitive - MD5 used for checksums not security
+      - G501 # Blocklisted import crypto/md5 - MD5 used for checksums not security
+      - G115 # Integer overflow conversion - system level operations
   gocritic:
     enabled-tags:
       - diagnostic

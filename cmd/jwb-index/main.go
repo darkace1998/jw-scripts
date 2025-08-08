@@ -106,6 +106,7 @@ func run(s *config.Settings) error {
 
 	if s.Mode == "run" {
 		// TODO: Implement run mode
+		return fmt.Errorf("run mode not yet implemented")
 	}
 
 	if s.WorkDir == "" {

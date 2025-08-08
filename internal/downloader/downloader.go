@@ -17,15 +17,18 @@ import (
 )
 
 var (
-	ErrDiskLimitReached    = errors.New("disk limit reached")
-	ErrMissingTimestamp    = errors.New("missing timestamp")
+	// ErrDiskLimitReached is returned when the disk space limit has been reached
+	ErrDiskLimitReached = errors.New("disk limit reached")
+	// ErrMissingTimestamp is returned when a required timestamp is missing
+	ErrMissingTimestamp = errors.New("missing timestamp")
+	// ErrCannotFreeDiskSpace is returned when disk space cannot be freed
 	ErrCannotFreeDiskSpace = errors.New("cannot free more disk space")
 )
 
 // DownloadAll downloads all media files.
 func DownloadAll(s *config.Settings, data []*api.Category) error {
 	wd := filepath.Join(s.WorkDir, s.SubDir)
-	if err := os.MkdirAll(wd, os.ModePerm); err != nil {
+	if err := os.MkdirAll(wd, 0o750); err != nil {
 		return err
 	}
 
@@ -94,7 +97,7 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 }
 
 func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory string) error {
-	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+	if err := os.MkdirAll(directory, 0o750); err != nil {
 		return err
 	}
 
@@ -189,7 +192,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 
 // DownloadFile downloads a file from a URL to a specified path.
 func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit float64) error {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -207,7 +210,7 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		return fmt.Errorf("bad status: %s", resp.Status)
@@ -215,14 +218,14 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 
 	var out *os.File
 	if resume {
-		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
 	} else {
 		out, err = os.Create(path)
 	}
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	size := resp.ContentLength + start
 
@@ -238,7 +241,7 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 		progressbar.OptionSpinnerType(14),
 		progressbar.OptionFullWidth(),
 	)
-	bar.Add64(start)
+	_ = bar.Add64(start)
 
 	var body io.Reader = resp.Body
 	if rateLimit > 0 {
@@ -255,7 +258,7 @@ func CheckMD5(path, expectedMD5 string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -372,7 +375,7 @@ func (r *throttledReader) Read(p []byte) (n int, err error) {
 
 	// Calculate expected time for the data read so far
 	expectedTime := float64(r.totalRead) / r.rateLimit
-	
+
 	// If we're reading too fast, sleep
 	if elapsed < expectedTime {
 		sleepTime := time.Duration((expectedTime - elapsed) * float64(time.Second))

@@ -52,7 +52,7 @@ func TestGetBestVideo(t *testing.T) {
 				{ProgressiveDownloadURL: "480p.mp4", Label: "480p", Subtitled: false},
 			},
 			quality:   720,
-			subtitles: true, // prefer subs, but none available
+			subtitles: true,                                                                       // prefer subs, but none available
 			want:      &File{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Subtitled: false}, // should still pick best quality
 		},
 		{
@@ -210,8 +210,8 @@ func TestParseDate(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "valid date without milliseconds",
-			dateStr:   "2021-06-25T10:00:00",
+			name:    "valid date without milliseconds",
+			dateStr: "2021-06-25T10:00:00",
 			// The original function strips the Z, so this will be parsed as local time.
 			// Let's adjust the test to handle this.
 			// No, the original function's regex only strips `.123Z`. It doesn't handle a missing `Z`.

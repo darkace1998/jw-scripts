@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	unlimitedRateMaxDuration   = 100 * time.Millisecond
-	zeroRateLimitMaxDuration   = 100 * time.Millisecond
+	unlimitedRateMaxDuration = 100 * time.Millisecond
+	zeroRateLimitMaxDuration = 100 * time.Millisecond
 )
 
 func TestThrottledReader(t *testing.T) {
@@ -22,8 +22,8 @@ func TestThrottledReader(t *testing.T) {
 		{
 			name:      "No rate limit",
 			dataSize:  64 * 1024, // 64KB
-			rateLimit: 0,          // No limit
-			tolerance: 0,          // Not applicable for unlimited
+			rateLimit: 0,         // No limit
+			tolerance: 0,         // Not applicable for unlimited
 		},
 		{
 			name:      "Small rate limit",
@@ -48,7 +48,7 @@ func TestThrottledReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data := strings.Repeat("A", tt.dataSize)
-			
+
 			var reader io.Reader = strings.NewReader(data)
 			if tt.rateLimit > 0 {
 				reader = newThrottledReader(reader, tt.rateLimit)
@@ -70,7 +70,7 @@ func TestThrottledReader(t *testing.T) {
 			}
 
 			elapsed := time.Since(start)
-			
+
 			if totalRead != tt.dataSize {
 				t.Errorf("Expected to read %d bytes, got %d", tt.dataSize, totalRead)
 			}
@@ -78,17 +78,17 @@ func TestThrottledReader(t *testing.T) {
 			if tt.rateLimit > 0 {
 				actualRate := float64(totalRead) / elapsed.Seconds() / 1024 / 1024 // MB/s
 				efficiency := (actualRate / tt.rateLimit) * 100
-				
+
 				if efficiency > 100+tt.tolerance {
-					t.Errorf("Rate too high: expected ~%.2f MB/s, got %.2f MB/s (%.1f%% efficiency)", 
+					t.Errorf("Rate too high: expected ~%.2f MB/s, got %.2f MB/s (%.1f%% efficiency)",
 						tt.rateLimit, actualRate, efficiency)
 				}
 				if efficiency < 100-tt.tolerance {
-					t.Errorf("Rate too low: expected ~%.2f MB/s, got %.2f MB/s (%.1f%% efficiency)", 
+					t.Errorf("Rate too low: expected ~%.2f MB/s, got %.2f MB/s (%.1f%% efficiency)",
 						tt.rateLimit, actualRate, efficiency)
 				}
-				
-				t.Logf("Rate limit test passed: %.2f MB/s target, %.2f MB/s actual (%.1f%% efficiency)", 
+
+				t.Logf("Rate limit test passed: %.2f MB/s target, %.2f MB/s actual (%.1f%% efficiency)",
 					tt.rateLimit, actualRate, efficiency)
 			} else {
 				// For unlimited, just check it completed quickly
@@ -129,7 +129,7 @@ func TestThrottledReaderZeroRateLimit(t *testing.T) {
 }
 
 func TestThrottledReaderSmallReads(t *testing.T) {
-	data := strings.Repeat("B", 1024) // 1KB
+	data := strings.Repeat("B", 1024)                          // 1KB
 	reader := newThrottledReader(strings.NewReader(data), 0.1) // Very slow: 0.1 MB/s
 
 	start := time.Now()
@@ -158,39 +158,39 @@ func TestThrottledReaderSmallReads(t *testing.T) {
 	if actualRate > 0.15 || actualRate < 0.05 {
 		t.Errorf("Rate should be ~0.1 MB/s, got %.3f MB/s", actualRate)
 	}
-	
+
 	t.Logf("Small reads test: %.3f MB/s (target 0.1 MB/s)", actualRate)
 }
 
 func TestThrottledReaderRestart(t *testing.T) {
 	// Test that a new throttledReader starts fresh each time
 	data := strings.Repeat("C", 512) // 512 bytes
-	
+
 	// First read
 	reader1 := newThrottledReader(strings.NewReader(data), 0.1) // 0.1 MB/s
 	buf := make([]byte, 256)
-	
+
 	start := time.Now()
 	n1, err := reader1.Read(buf)
 	if err != nil {
 		t.Fatalf("First read error: %v", err)
 	}
-	
+
 	// Second read from the same reader (should continue throttling from where it left off)
 	n2, err := reader1.Read(buf[n1:])
 	elapsed := time.Since(start)
-	
+
 	if err != nil && err != io.EOF {
 		t.Fatalf("Second read error: %v", err)
 	}
-	
+
 	totalRead := n1 + n2
 	actualRate := float64(totalRead) / elapsed.Seconds() / 1024 / 1024
-	
+
 	// Should maintain the rate limit across multiple reads
 	if actualRate > 0.15 || actualRate < 0.05 {
 		t.Errorf("Rate across multiple reads should be ~0.1 MB/s, got %.3f MB/s", actualRate)
 	}
-	
+
 	t.Logf("Multi-read test: %.3f MB/s (target 0.1 MB/s)", actualRate)
 }
