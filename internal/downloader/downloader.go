@@ -288,12 +288,11 @@ func diskCleanup(s *config.Settings, directory string, referenceMedia *api.Media
 			return err
 		}
 
-		// Check for overflow before addition
-		if referenceMedia.Size > math.MaxInt64 - s.KeepFree {
-			// Addition would overflow, skip the check or handle error
+		needed := referenceMedia.Size + s.KeepFree
+		if needed < 0 {
+			// Overflow or negative values - skip the check
 			break
 		}
-		needed := referenceMedia.Size + s.KeepFree
 		if free > uint64(needed) {
 			break
 		}

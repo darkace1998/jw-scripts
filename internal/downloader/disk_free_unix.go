@@ -12,7 +12,7 @@ func getFreeDiskSpace(path string) (uint64, error) {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return 0, err
 	}
-	if stat.Bsize == 0 {
+	if stat.Bsize < 0 {
 		return 0, fmt.Errorf("invalid block size: %d", stat.Bsize)
 	}
 	return stat.Bavail * uint64(stat.Bsize), nil
