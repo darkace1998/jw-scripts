@@ -1,0 +1,314 @@
+package api
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/allejok96/jwb-go/internal/config"
+)
+
+const (
+	baseURL = "https://data.jw-api.org/mediator/v1"
+)
+
+// Client is a client for the JW.ORG API.
+type Client struct {
+	baseURL    string
+	httpClient *http.Client
+	settings   *config.Settings
+}
+
+// NewClient creates a new API client.
+func NewClient(s *config.Settings) *Client {
+	return &Client{
+		baseURL:    baseURL,
+		httpClient: &http.Client{},
+		settings:   s,
+	}
+}
+
+// GetLanguages fetches the list of available languages.
+func (c *Client) GetLanguages() ([]Language, error) {
+	url := fmt.Sprintf("%s/languages/E/web?clientType=www", c.baseURL)
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get languages: %s", resp.Status)
+	}
+
+	var langResp LanguagesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&langResp); err != nil {
+		return nil, err
+	}
+
+	return langResp.Languages, nil
+}
+
+// GetCategory fetches a category by its key.
+func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
+	url := fmt.Sprintf("%s/categories/%s/%s?detailed=1", c.baseURL, lang, key)
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get category %s: %s", key, resp.Status)
+	}
+
+	var catResp CategoryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&catResp); err != nil {
+		return nil, err
+	}
+
+	return &catResp, nil
+}
+
+// ParseBroadcasting is the main function to parse the broadcasting data.
+func (c *Client) ParseBroadcasting() ([]*Category, error) {
+	queue := make([]string, len(c.settings.IncludeCategories))
+	copy(queue, c.settings.IncludeCategories)
+
+	var result []*Category
+
+	processed := make(map[string]bool)
+
+	for len(queue) > 0 {
+		key := queue[0]
+		queue = queue[1:]
+
+		if processed[key] {
+			continue
+		}
+		processed[key] = true
+
+		if c.settings.Quiet < 1 {
+			fmt.Fprintf(os.Stderr, "indexing: %s\n", key)
+		}
+
+		catResp, err := c.GetCategory(c.settings.Lang, key)
+		if err != nil {
+			// In the Python code, a 404 is not a fatal error, so we just print a message.
+			if c.settings.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "could not get category %s: %v\n", key, err)
+			}
+			continue
+		}
+
+		cat := &Category{
+			Key:  catResp.Category.Key,
+			Name: catResp.Category.Name,
+			Home: contains(c.settings.IncludeCategories, catResp.Category.Key),
+		}
+		if !c.settings.Update {
+			result = append(result, cat)
+		}
+
+		for _, sub := range catResp.Category.Subcategories {
+			subCat := &Category{
+				Key:  sub.Key,
+				Name: sub.Name,
+			}
+			cat.Contents = append(cat.Contents, subCat)
+			if !contains(c.settings.ExcludeCategories, sub.Key) {
+				queue = append(queue, sub.Key)
+			}
+		}
+
+		for _, m := range catResp.Category.Media {
+			if contains(c.settings.FilterCategories, m.PrimaryCategory) {
+				continue
+			}
+
+			var bestFile *struct {
+				ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
+				Checksum               string `json:"checksum"`
+				Filesize               int64  `json:"filesize"`
+				Duration               int    `json:"duration"`
+				Label                  string `json:"label"`
+				Subtitled              bool   `json:"subtitled"`
+				Subtitles              struct {
+					URL string `json:"url"`
+				} `json:"subtitles"`
+			}
+
+			if m.Type == "audio" {
+				if len(m.Files) > 0 {
+					bestFile = &m.Files[0]
+				}
+			} else {
+				bestFile = getBestVideo(m.Files, c.settings.Quality, c.settings.HardSubtitles)
+			}
+
+			if bestFile == nil {
+				if c.settings.Quiet < 1 {
+					fmt.Fprintf(os.Stderr, "no media files found for: %s\n", m.Title)
+				}
+				continue
+			}
+
+			media := &Media{
+				URL:         bestFile.ProgressiveDownloadURL,
+				Name:        m.Title,
+				MD5:         bestFile.Checksum,
+				Size:        bestFile.Filesize,
+				Duration:    bestFile.Duration,
+				SubtitleURL: bestFile.Subtitles.URL,
+			}
+
+			if m.FirstPublished != "" {
+				date, err := parseDate(m.FirstPublished)
+				if err != nil {
+					if c.settings.Quiet < 1 {
+						fmt.Fprintf(os.Stderr, "could not get timestamp on: %s\n", m.Title)
+					}
+				} else {
+					if date.Unix() < c.settings.MinDate {
+						continue
+					}
+					media.Date = date.Unix()
+				}
+			}
+
+			media.Filename = getFilename(media.URL, c.settings.SafeFilenames)
+			media.FriendlyName = getFriendlyFilename(media.Name, media.URL, c.settings.SafeFilenames)
+			media.SubtitleFilename = getFilename(media.SubtitleURL, c.settings.SafeFilenames)
+
+			if c.settings.Update {
+				var pcat *Category
+				for _, r := range result {
+					if r.Key == m.PrimaryCategory {
+						pcat = r
+						break
+					}
+				}
+				if pcat == nil {
+					pcat = &Category{
+						Key:  m.PrimaryCategory,
+						Home: false,
+					}
+					result = append(result, pcat)
+				}
+				pcat.Contents = append(pcat.Contents, media)
+			} else {
+				cat.Contents = append(cat.Contents, media)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+
+func getBestVideo(files []struct {
+	ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
+	Checksum               string `json:"checksum"`
+	Filesize               int64  `json:"filesize"`
+	Duration               int    `json:"duration"`
+	Label                  string `json:"label"`
+	Subtitled              bool   `json:"subtitled"`
+	Subtitles              struct {
+		URL string `json:"url"`
+	} `json:"subtitles"`
+}, quality int, subtitles bool) *struct {
+	ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
+	Checksum               string `json:"checksum"`
+	Filesize               int64  `json:"filesize"`
+	Duration               int    `json:"duration"`
+	Label                  string `json:"label"`
+	Subtitled              bool   `json:"subtitled"`
+	Subtitles              struct {
+		URL string `json:"url"`
+	} `json:"subtitles"`
+} {
+	var bestFile *struct {
+		ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
+		Checksum               string `json:"checksum"`
+		Filesize               int64  `json:"filesize"`
+		Duration               int    `json:"duration"`
+		Label                  string `json:"label"`
+		Subtitled              bool   `json:"subtitled"`
+		Subtitles              struct {
+			URL string `json:"url"`
+		} `json:"subtitles"`
+	}
+	maxRank := -1
+
+	for i := range files {
+		file := &files[i]
+		rank := 0
+		res, _ := strconv.Atoi(strings.TrimSuffix(file.Label, "p"))
+		rank += res / 10
+		if res > 0 && res <= quality {
+			rank += 200
+		}
+		if file.Subtitled == subtitles {
+			rank += 100
+		}
+
+		if rank > maxRank {
+			maxRank = rank
+			bestFile = file
+		}
+	}
+
+	return bestFile
+}
+
+func parseDate(dateString string) (time.Time, error) {
+	re := regexp.MustCompile(`\.[0-9]+Z$`)
+	dateString = re.ReplaceAllString(dateString, "")
+	return time.Parse("2006-01-02T15:04:05", dateString)
+}
+
+func formatFilename(s string, safe bool) string {
+	var forbidden string
+	if safe {
+		s = strings.ReplaceAll(s, `"`, "'")
+		s = strings.ReplaceAll(s, ":", ".")
+		forbidden = `<>|?\\*/\0\n`
+	} else {
+		forbidden = "/\0"
+	}
+	return strings.Map(func(r rune) rune {
+		if strings.ContainsRune(forbidden, r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+func getFilename(url string, safe bool) string {
+	if url == "" {
+		return ""
+	}
+	return formatFilename(filepath.Base(url), safe)
+}
+
+func getFriendlyFilename(name, url string, safe bool) string {
+	if url == "" {
+		return ""
+	}
+	return formatFilename(name+filepath.Ext(url), safe)
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
