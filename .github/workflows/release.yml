@@ -1,0 +1,167 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.24-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.24-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests
+      run: go test -v ./...
+
+    - name: Set release version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build binaries for multiple platforms
+      run: |
+        mkdir -p dist
+        
+        # Define platforms and architectures
+        platforms=(
+          "linux/amd64"
+          "linux/arm64"
+          "windows/amd64"
+          "windows/arm64"
+          "darwin/amd64"
+          "darwin/arm64"
+        )
+        
+        for platform in "${platforms[@]}"; do
+          IFS='/' read -r GOOS GOARCH <<< "$platform"
+          
+          echo "Building for $GOOS/$GOARCH..."
+          
+          # Set binary extension for Windows
+          EXT=""
+          if [[ "$GOOS" == "windows" ]]; then
+            EXT=".exe"
+          fi
+          
+          # Build each binary
+          for cmd in jwb-index jwb-offline; do
+            binary_name="${cmd}-${GOOS}-${GOARCH}${EXT}"
+            
+            env GOOS=$GOOS GOARCH=$GOARCH go build \
+              -ldflags="-s -w -X main.version=${{ steps.version.outputs.VERSION }}" \
+              -o "dist/${binary_name}" \
+              "./cmd/${cmd}"
+          done
+          
+          # Create platform-specific archive
+          archive_name="jw-scripts-${{ steps.version.outputs.VERSION }}-${GOOS}-${GOARCH}"
+          
+          if [[ "$GOOS" == "windows" ]]; then
+            cd dist
+            zip "${archive_name}.zip" *-${GOOS}-${GOARCH}.exe
+            cd ..
+          else
+            cd dist
+            tar -czf "${archive_name}.tar.gz" *-${GOOS}-${GOARCH}
+            cd ..
+          fi
+        done
+        
+        # List all built files
+        ls -la dist/
+
+    - name: Generate checksums
+      run: |
+        cd dist
+        sha256sum * > checksums.txt
+        cat checksums.txt
+
+    - name: Create Release Notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << 'EOF'
+        ## JW Scripts ${{ steps.version.outputs.VERSION }}
+        
+        ### Downloads
+        
+        Choose the appropriate binary for your platform:
+        
+        - **Linux (x64)**: `jwb-index-linux-amd64`, `jwb-offline-linux-amd64`
+        - **Linux (ARM64)**: `jwb-index-linux-arm64`, `jwb-offline-linux-arm64`
+        - **Windows (x64)**: `jwb-index-windows-amd64.exe`, `jwb-offline-windows-amd64.exe`
+        - **Windows (ARM64)**: `jwb-index-windows-arm64.exe`, `jwb-offline-windows-arm64.exe`
+        - **macOS (Intel)**: `jwb-index-darwin-amd64`, `jwb-offline-darwin-amd64`
+        - **macOS (Apple Silicon)**: `jwb-index-darwin-arm64`, `jwb-offline-darwin-arm64`
+        
+        Or download the complete archives:
+        - Platform-specific `.tar.gz` (Linux/macOS) or `.zip` (Windows) files
+        
+        ### Usage
+        
+        After downloading, make the binaries executable (Linux/macOS):
+        ```bash
+        chmod +x jwb-index-* jwb-offline-*
+        ```
+        
+        For help with commands:
+        ```bash
+        ./jwb-index --help
+        ./jwb-offline --help
+        ```
+        
+        ### Verification
+        
+        Verify downloads using the provided `checksums.txt` file:
+        ```bash
+        sha256sum -c checksums.txt
+        ```
+        EOF
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: Release ${{ steps.version.outputs.VERSION }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        files: |
+          dist/*
+        generate_release_notes: true
