@@ -3,7 +3,6 @@ package output
 import (
 	"fmt"
 	"html"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
