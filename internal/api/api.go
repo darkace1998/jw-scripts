@@ -11,7 +11,7 @@ type Category struct {
 // Media represents a single media item, like a video or audio file.
 type Media struct {
 	Date             int64
-	Duration         int
+	Duration         float64
 	MD5              string
 	Name             string
 	Size             int64
@@ -20,6 +20,22 @@ type Media struct {
 	Filename         string
 	FriendlyName     string
 	SubtitleFilename string
+}
+
+// File represents a media file, like a video or audio file.
+type File struct {
+	ProgressiveDownloadURL string    `json:"progressiveDownloadURL"`
+	Checksum               string    `json:"checksum"`
+	Filesize               int64     `json:"filesize"`
+	Duration               float64   `json:"duration"`
+	Label                  string    `json:"label"`
+	Subtitled              bool      `json:"subtitled"`
+	Subtitles              Subtitles `json:"subtitles"`
+}
+
+// Subtitles represents the subtitles for a media file.
+type Subtitles struct {
+	URL string `json:"url"`
 }
 
 // Language represents a single language available on JW Broadcasting.
@@ -47,17 +63,7 @@ type CategoryResponse struct {
 			Type            string `json:"type"`
 			PrimaryCategory string `json:"primaryCategory"`
 			FirstPublished  string `json:"firstPublished"`
-			Files           []struct {
-				ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-				Checksum               string `json:"checksum"`
-				Filesize               int64  `json:"filesize"`
-				Duration               int    `json:"duration"`
-				Label                  string `json:"label"`
-				Subtitled              bool   `json:"subtitled"`
-				Subtitles              struct {
-					URL string `json:"url"`
-				} `json:"subtitles"`
-			} `json:"files"`
+			Files           []File `json:"files"`
 		} `json:"media"`
 	} `json:"category"`
 }

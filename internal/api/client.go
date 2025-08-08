@@ -132,17 +132,7 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 				continue
 			}
 
-			var bestFile *struct {
-				ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-				Checksum               string `json:"checksum"`
-				Filesize               int64  `json:"filesize"`
-				Duration               int    `json:"duration"`
-				Label                  string `json:"label"`
-				Subtitled              bool   `json:"subtitled"`
-				Subtitles              struct {
-					URL string `json:"url"`
-				} `json:"subtitles"`
-			}
+			var bestFile *File
 
 			if m.Type == "audio" {
 				if len(m.Files) > 0 {
@@ -211,39 +201,8 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 	return result, nil
 }
 
-
-func getBestVideo(files []struct {
-	ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-	Checksum               string `json:"checksum"`
-	Filesize               int64  `json:"filesize"`
-	Duration               int    `json:"duration"`
-	Label                  string `json:"label"`
-	Subtitled              bool   `json:"subtitled"`
-	Subtitles              struct {
-		URL string `json:"url"`
-	} `json:"subtitles"`
-}, quality int, subtitles bool) *struct {
-	ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-	Checksum               string `json:"checksum"`
-	Filesize               int64  `json:"filesize"`
-	Duration               int    `json:"duration"`
-	Label                  string `json:"label"`
-	Subtitled              bool   `json:"subtitled"`
-	Subtitles              struct {
-		URL string `json:"url"`
-	} `json:"subtitles"`
-} {
-	var bestFile *struct {
-		ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-		Checksum               string `json:"checksum"`
-		Filesize               int64  `json:"filesize"`
-		Duration               int    `json:"duration"`
-		Label                  string `json:"label"`
-		Subtitled              bool   `json:"subtitled"`
-		Subtitles              struct {
-			URL string `json:"url"`
-		} `json:"subtitles"`
-	}
+func getBestVideo(files []File, quality int, subtitles bool) *File {
+	var bestFile *File
 	maxRank := -1
 
 	for i := range files {
