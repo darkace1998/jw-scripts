@@ -221,7 +221,7 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 		// #nosec G304 - Path is from download logic for legitimate file operations
 		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
 	} else {
-		// #nosec G304 - Path is from download logic for legitimate file operations  
+		// #nosec G304 - Path is from download logic for legitimate file operations
 		out, err = os.Create(path)
 	}
 	if err != nil {
