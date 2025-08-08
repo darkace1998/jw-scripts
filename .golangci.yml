@@ -20,7 +20,7 @@ linters:
 
 linters-settings:
   revive:
-        severity: warning
+    severity: warning
     rules:
       - name: exported
         severity: warning
