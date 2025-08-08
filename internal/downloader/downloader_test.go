@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+const (
+	unlimitedRateMaxDuration   = 100 * time.Millisecond
+	zeroRateLimitMaxDuration   = 100 * time.Millisecond
+)
+
 func TestThrottledReader(t *testing.T) {
 	tests := []struct {
 		name      string
