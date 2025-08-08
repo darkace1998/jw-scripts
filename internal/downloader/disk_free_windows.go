@@ -7,16 +7,23 @@ import (
 	"unsafe"
 )
 
-func getFreeDiskSpace(path string) (uint64, error) {
-	kernel32, err := syscall.LoadDLL("kernel32.dll")
-	if err != nil {
-		return 0, err
-	}
-	defer kernel32.Release()
+var (
+	kernel32              *syscall.DLL
+	getDiskFreeSpaceExW   *syscall.Proc
+	dllLoadErr            error
+)
 
-	getDiskFreeSpaceExW, err := kernel32.FindProc("GetDiskFreeSpaceExW")
-	if err != nil {
-		return 0, err
+func init() {
+	kernel32, dllLoadErr = syscall.LoadDLL("kernel32.dll")
+	if dllLoadErr != nil {
+		return
+	}
+	getDiskFreeSpaceExW, dllLoadErr = kernel32.FindProc("GetDiskFreeSpaceExW")
+}
+
+func getFreeDiskSpace(path string) (uint64, error) {
+	if dllLoadErr != nil {
+		return 0, dllLoadErr
 	}
 
 	var freeBytes int64
