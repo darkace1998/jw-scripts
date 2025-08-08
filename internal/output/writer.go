@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"html"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -80,7 +81,7 @@ func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error
 		writer.Add(PlaylistEntry{
 			Name:     media.Name,
 			Source:   source,
-			Duration: media.Duration,
+			Duration: int(math.Round(media.Duration)),
 		})
 	}
 

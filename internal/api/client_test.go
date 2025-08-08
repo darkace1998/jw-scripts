@@ -7,70 +7,57 @@ import (
 )
 
 func TestGetBestVideo(t *testing.T) {
-	// The anonymous struct is defined here to match the one in getBestVideo
-	type file struct {
-		ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-		Checksum               string `json:"checksum"`
-		Filesize               int64  `json:"filesize"`
-		Duration               int    `json:"duration"`
-		Label                  string `json:"label"`
-		Subtitled              bool   `json:"subtitled"`
-		Subtitles              struct {
-			URL string `json:"url"`
-		} `json:"subtitles"`
-	}
-
 	testCases := []struct {
 		name      string
-		files     []file
+		files     []File
 		quality   int
 		subtitles bool
-		want      *file
+		want      *File
 	}{
 		{
 			name: "select highest quality",
-			files: []file{
+			files: []File{
 				{ProgressiveDownloadURL: "720p.mp4", Label: "720p"},
 				{ProgressiveDownloadURL: "480p.mp4", Label: "480p"},
 				{ProgressiveDownloadURL: "360p.mp4", Label: "360p"},
 			},
 			quality:   720,
 			subtitles: false,
-			want:      &file{ProgressiveDownloadURL: "720p.mp4", Label: "720p"},
+			want:      &File{ProgressiveDownloadURL: "720p.mp4", Label: "720p"},
 		},
 		{
 			name: "quality limit",
-			files: []file{
+			files: []File{
 				{ProgressiveDownloadURL: "720p.mp4", Label: "720p"},
 				{ProgressiveDownloadURL: "480p.mp4", Label: "480p"},
 			},
 			quality:   480,
 			subtitles: false,
-			want:      &file{ProgressiveDownloadURL: "480p.mp4", Label: "480p"},
+			want:      &File{ProgressiveDownloadURL: "480p.mp4", Label: "480p"},
 		},
 		{
 			name: "prefer subtitles",
-			files: []file{
+			files: []File{
 				{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Subtitled: false},
 				{ProgressiveDownloadURL: "720p_sub.mp4", Label: "720p", Subtitled: true},
 			},
 			quality:   720,
 			subtitles: true,
-			want:      &file{ProgressiveDownloadURL: "720p_sub.mp4", Label: "720p", Subtitled: true},
+			want:      &File{ProgressiveDownloadURL: "720p_sub.mp4", Label: "720p", Subtitled: true},
 		},
 		{
 			name: "no matching subtitles",
-			files: []file{
+			files: []File{
 				{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Subtitled: false},
 				{ProgressiveDownloadURL: "480p.mp4", Label: "480p", Subtitled: false},
 			},
 			quality:   720,
 			subtitles: true, // prefer subs, but none available
-			want:      &file{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Subtitled: false}, // should still pick best quality
+			want:      &File{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Subtitled: false}, // should still pick best quality
 		},
 		{
 			name:      "empty file list",
-			files:     []file{},
+			files:     []File{},
 			quality:   720,
 			subtitles: false,
 			want:      nil,
@@ -79,79 +66,10 @@ func TestGetBestVideo(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Because the function expects a slice of a specific anonymous struct,
-			// we can't directly pass our named struct `file`.
-			// We need to convert it. This is a bit of a hack, but it's the only way
-			// without changing the original function's signature.
-			// A better approach would be to use reflection to create the slice, but that's too complex.
-			// Let's try to pass it directly. Go might be smart enough.
-			// No, it's not. The type is different.
-			// The easiest way is to copy the struct definition inside the test cases.
+			got := getBestVideo(tc.files, tc.quality, tc.subtitles)
 
-			// Re-running the thought process. The previous thought of defining the struct inside the test was correct.
-			// But it's cleaner to define it once. Let's see if I can make it work by defining the type.
-			// The problem is that `getBestVideo` uses an anonymous struct.
-			// The most pragmatic way is to just copy the struct definition into the test.
-			// It makes the test verbose, but it will work.
-
-			// Let's rewrite the testCases with the anonymous struct.
-			// This is getting too complicated. I will simplify the test creation.
-			// I'll define the struct inside the test function.
-
-			// The anonymous struct definition is identical to the one in getBestVideo
-			files := make([]struct {
-				ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-				Checksum               string `json:"checksum"`
-				Filesize               int64  `json:"filesize"`
-				Duration               int    `json:"duration"`
-				Label                  string `json:"label"`
-				Subtitled              bool   `json:"subtitled"`
-				Subtitles              struct {
-					URL string `json:"url"`
-				} `json:"subtitles"`
-			}, len(tc.files))
-
-			for i, f := range tc.files {
-				files[i].ProgressiveDownloadURL = f.ProgressiveDownloadURL
-				files[i].Label = f.Label
-				files[i].Subtitled = f.Subtitled
-			}
-
-			var want *struct {
-				ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-				Checksum               string `json:"checksum"`
-				Filesize               int64  `json:"filesize"`
-				Duration               int    `json:"duration"`
-				Label                  string `json:"label"`
-				Subtitled              bool   `json:"subtitled"`
-				Subtitles              struct {
-					URL string `json:"url"`
-				} `json:"subtitles"`
-			}
-
-			if tc.want != nil {
-				want = &struct {
-					ProgressiveDownloadURL string `json:"progressiveDownloadURL"`
-					Checksum               string `json:"checksum"`
-					Filesize               int64  `json:"filesize"`
-					Duration               int    `json:"duration"`
-					Label                  string `json:"label"`
-					Subtitled              bool   `json:"subtitled"`
-					Subtitles              struct {
-						URL string `json:"url"`
-					} `json:"subtitles"`
-				}{
-					ProgressiveDownloadURL: tc.want.ProgressiveDownloadURL,
-					Label:                  tc.want.Label,
-					Subtitled:              tc.want.Subtitled,
-				}
-			}
-
-			got := getBestVideo(files, tc.quality, tc.subtitles)
-
-			// We need to compare the pointers' values, not the pointers themselves.
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("getBestVideo() got = %v, want %v", got, want)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("getBestVideo() got = %v, want %v", got, tc.want)
 			}
 		})
 	}
