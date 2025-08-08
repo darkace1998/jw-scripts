@@ -194,6 +194,7 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("output filename is required for txt mode")
 	}
+	// #nosec G304 - Path is user-configured output file for legitimate file operations
 	file, err := os.Create(filepath.Join(s.WorkDir, filename))
 	if err != nil {
 		return nil, err
@@ -310,6 +311,7 @@ func (w *CommandWriter) Dump() error {
 		args = append(args, entry.Source)
 	}
 
+	// #nosec G204 - Command is user-configurable via CLI flags for external tool integration
 	cmd := exec.Command(w.s.Command[0], append(w.s.Command[1:], args...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

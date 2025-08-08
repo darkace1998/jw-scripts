@@ -163,6 +163,7 @@ func (m *VideoManager) playVideo() error {
 	}
 	cmdArgs = append(cmdArgs, m.video)
 
+	// #nosec G204 - Command is user-configurable via CLI flags for media player functionality
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	if m.verbose {
 		cmd.Stdout = os.Stdout

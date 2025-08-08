@@ -215,8 +215,10 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 
 	var out *os.File
 	if resume {
+		// #nosec G304 - Path is from download logic for legitimate file operations
 		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
 	} else {
+		// #nosec G304 - Path is from download logic for legitimate file operations  
 		out, err = os.Create(path)
 	}
 	if err != nil {
@@ -256,6 +258,7 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 // Note: MD5 is used here for file integrity verification (not cryptographic security)
 // as it matches the checksum format provided by the external API.
 func CheckMD5(path, expectedMD5 string) (bool, error) {
+	// #nosec G304 - Path is for file checksum verification in download process
 	f, err := os.Open(path)
 	if err != nil {
 		return false, err
