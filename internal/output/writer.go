@@ -100,7 +100,7 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 
 	for _, category := range data {
 		catDir := filepath.Join(dataDir, category.Key)
-		if err := os.MkdirAll(catDir, 0750); err != nil {
+		if err := os.MkdirAll(catDir, 0o750); err != nil {
 			return err
 		}
 
@@ -118,7 +118,7 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 			switch v := item.(type) {
 			case *api.Category:
 				linkDest := filepath.Join(dataDir, v.Key)
-				if err := os.MkdirAll(linkDest, 0750); err != nil {
+				if err := os.MkdirAll(linkDest, 0o750); err != nil {
 					return err
 				}
 				linkFile := filepath.Join(catDir, v.Name)

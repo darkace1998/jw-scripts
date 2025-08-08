@@ -18,15 +18,17 @@ import (
 
 var (
 	// ErrDiskLimitReached is returned when the disk space limit has been reached
-	ErrDiskLimitReached    = errors.New("disk limit reached")
-	ErrMissingTimestamp    = errors.New("missing timestamp")
+	ErrDiskLimitReached = errors.New("disk limit reached")
+	// ErrMissingTimestamp is returned when a required timestamp is missing
+	ErrMissingTimestamp = errors.New("missing timestamp")
+	// ErrCannotFreeDiskSpace is returned when disk space cannot be freed
 	ErrCannotFreeDiskSpace = errors.New("cannot free more disk space")
 )
 
 // DownloadAll downloads all media files.
 func DownloadAll(s *config.Settings, data []*api.Category) error {
 	wd := filepath.Join(s.WorkDir, s.SubDir)
-	if err := os.MkdirAll(wd, 0750); err != nil {
+	if err := os.MkdirAll(wd, 0o750); err != nil {
 		return err
 	}
 
@@ -95,7 +97,7 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 }
 
 func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory string) error {
-	if err := os.MkdirAll(directory, 0750); err != nil {
+	if err := os.MkdirAll(directory, 0o750); err != nil {
 		return err
 	}
 
@@ -216,7 +218,7 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 
 	var out *os.File
 	if resume {
-		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
 	} else {
 		out, err = os.Create(path)
 	}
