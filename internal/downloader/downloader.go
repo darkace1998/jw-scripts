@@ -1,7 +1,7 @@
 package downloader
 
 import (
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 - MD5 used for file integrity verification, not cryptographic security
 	"errors"
 	"fmt"
 	"io"
@@ -25,7 +25,7 @@ var (
 // DownloadAll downloads all media files.
 func DownloadAll(s *config.Settings, data []*api.Category) error {
 	wd := filepath.Join(s.WorkDir, s.SubDir)
-	if err := os.MkdirAll(wd, os.ModePerm); err != nil {
+	if err := os.MkdirAll(wd, 0750); err != nil {
 		return err
 	}
 
@@ -94,7 +94,7 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 }
 
 func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory string) error {
-	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+	if err := os.MkdirAll(directory, 0750); err != nil {
 		return err
 	}
 
@@ -215,7 +215,7 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 
 	var out *os.File
 	if resume {
-		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
 	} else {
 		out, err = os.Create(path)
 	}
@@ -238,7 +238,10 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 		progressbar.OptionSpinnerType(14),
 		progressbar.OptionFullWidth(),
 	)
-	bar.Add64(start)
+	if err := bar.Add64(start); err != nil {
+		// Log error but continue - progress bar errors shouldn't stop download
+		fmt.Fprintf(os.Stderr, "Progress bar error: %v\n", err)
+	}
 
 	var body io.Reader = resp.Body
 	if rateLimit > 0 {
@@ -250,6 +253,8 @@ func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit f
 }
 
 // CheckMD5 calculates the MD5 checksum of a file and compares it to the expected checksum.
+// Note: MD5 is used here for file integrity verification (not cryptographic security)
+// as it matches the checksum format provided by the external API.
 func CheckMD5(path, expectedMD5 string) (bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -257,7 +262,7 @@ func CheckMD5(path, expectedMD5 string) (bool, error) {
 	}
 	defer f.Close()
 
-	h := md5.New()
+	h := md5.New() // #nosec G401 - MD5 used for file integrity verification, not cryptographic security
 	if _, err := io.Copy(h, f); err != nil {
 		return false, err
 	}
@@ -281,6 +286,10 @@ func diskCleanup(s *config.Settings, directory string, referenceMedia *api.Media
 		}
 
 		needed := referenceMedia.Size + s.KeepFree
+		if needed < 0 {
+			// Overflow or negative values - skip the check
+			break
+		}
 		if free > uint64(needed) {
 			break
 		}

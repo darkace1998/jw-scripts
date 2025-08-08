@@ -112,7 +112,7 @@ func (m *VideoManager) writeDump() error {
 		return err
 	}
 
-	return os.WriteFile(m.dumpFile, data, 0644)
+	return os.WriteFile(m.dumpFile, data, 0600)
 }
 
 func (m *VideoManager) setRandomVideo() bool {
