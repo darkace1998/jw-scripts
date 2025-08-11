@@ -97,13 +97,13 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 				categoryMedia = append(categoryMedia, media)
 			}
 		}
-		
+
 		if len(categoryMedia) == 0 {
 			continue
 		}
-		
+
 		sortMedia(categoryMedia, s.Sort)
-		
+
 		// Create separate output file for each category
 		originalFilename := s.OutputFilename
 		if originalFilename == "" {
@@ -113,11 +113,11 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 			base := strings.TrimSuffix(originalFilename, ext)
 			s.OutputFilename = fmt.Sprintf("%s_%s%s", base, category.Key, ext)
 		}
-		
+
 		// Create new writer for this category
 		var categoryWriter Writer
 		var err error
-		
+
 		switch {
 		case strings.HasPrefix(s.Mode, "txt"):
 			categoryWriter, err = NewTxtWriter(s)
@@ -130,12 +130,12 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 			s.OutputFilename = originalFilename
 			return outputSingle(s, data, writer)
 		}
-		
+
 		if err != nil {
 			s.OutputFilename = originalFilename
 			return err
 		}
-		
+
 		for _, media := range categoryMedia {
 			source := media.URL
 			if fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
@@ -147,16 +147,16 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 				Duration: int(math.Round(media.Duration)),
 			})
 		}
-		
+
 		if err := categoryWriter.Dump(); err != nil {
 			s.OutputFilename = originalFilename
 			return err
 		}
-		
+
 		// Restore original filename
 		s.OutputFilename = originalFilename
 	}
-	
+
 	return nil
 }
 

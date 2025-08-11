@@ -84,7 +84,7 @@ func run(s *config.Settings) error {
 		if err != nil {
 			return fmt.Errorf("failed to get category %s: %v", s.PrintCategory, err)
 		}
-		
+
 		fmt.Printf("Category: %s (%s)\n", catResp.Category.Name, catResp.Category.Key)
 		if len(catResp.Category.Subcategories) > 0 {
 			fmt.Println("Subcategories:")
