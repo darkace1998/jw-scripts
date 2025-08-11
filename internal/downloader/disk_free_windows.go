@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	kernel32              *syscall.DLL
-	getDiskFreeSpaceExW   *syscall.Proc
-	dllLoadErr            error
+	kernel32            *syscall.DLL
+	getDiskFreeSpaceExW *syscall.Proc
+	dllLoadErr          error
 )
 
 func init() {

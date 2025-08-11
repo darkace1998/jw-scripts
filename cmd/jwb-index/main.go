@@ -34,6 +34,7 @@ func init() {
 	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", []string{"VideoOnDemand"}, "comma separated list of categories to index")
 	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")
 	rootCmd.Flags().BoolVar(&settings.CleanAllSymlinks, "clean-symlinks", false, "remove all old symlinks (mode=filesystem)")
+	rootCmd.Flags().StringSliceVar(&settings.Command, "command", []string{}, "command to execute in run mode")
 	rootCmd.Flags().BoolVarP(&settings.Download, "download", "d", false, "download media files")
 	rootCmd.Flags().BoolVar(&settings.DownloadSubtitles, "download-subtitles", false, "download VTT subtitle files")
 	rootCmd.Flags().StringSliceVar(&settings.ExcludeCategories, "exclude", []string{"VODSJJMeetings"}, "comma separated list of categories to skip")
@@ -79,7 +80,20 @@ func run(s *config.Settings) error {
 	}
 
 	if s.PrintCategory != "" {
-		// TODO: Implement list categories
+		catResp, err := client.GetCategory(s.Lang, s.PrintCategory)
+		if err != nil {
+			return fmt.Errorf("failed to get category %s: %v", s.PrintCategory, err)
+		}
+
+		fmt.Printf("Category: %s (%s)\n", catResp.Category.Name, catResp.Category.Key)
+		if len(catResp.Category.Subcategories) > 0 {
+			fmt.Println("Subcategories:")
+			for _, sub := range catResp.Category.Subcategories {
+				fmt.Printf("  %s (%s)\n", sub.Name, sub.Key)
+			}
+		} else {
+			fmt.Println("No subcategories found.")
+		}
 		return nil
 	}
 
@@ -105,8 +119,11 @@ func run(s *config.Settings) error {
 	}
 
 	if s.Mode == "run" {
-		// TODO: Implement run mode
-		return fmt.Errorf("run mode not yet implemented")
+		if len(s.Command) == 0 {
+			return fmt.Errorf("run mode requires a command to be specified")
+		}
+		// Run mode is handled by the output.CreateOutput function
+		// which will use the CommandWriter to execute the configured command
 	}
 
 	if s.WorkDir == "" {

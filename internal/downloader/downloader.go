@@ -170,7 +170,37 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 			return err
 		}
 
-		// TODO: Add validation for resumed downloads
+		// Validate resumed download if we have expected file size or checksum
+		if media.Size > 0 || (s.Checksums && media.MD5 != "") {
+			fi, err := os.Stat(tmpFile)
+			if err == nil {
+				// Check file size if available
+				if media.Size > 0 && fi.Size() != media.Size {
+					if s.Quiet < 2 {
+						fmt.Fprintf(os.Stderr, "resumed download size mismatch, restarting: %s\n", media.Filename)
+					}
+					if err := os.Remove(tmpFile); err != nil {
+						return err
+					}
+					if err := DownloadFile(s, media.URL, tmpFile, false, s.RateLimit); err != nil {
+						return err
+					}
+				} else if s.Checksums && media.MD5 != "" {
+					// Verify checksum if enabled and available
+					if ok, err := CheckMD5(tmpFile, media.MD5); err == nil && !ok {
+						if s.Quiet < 2 {
+							fmt.Fprintf(os.Stderr, "resumed download checksum mismatch, restarting: %s\n", media.Filename)
+						}
+						if err := os.Remove(tmpFile); err != nil {
+							return err
+						}
+						if err := DownloadFile(s, media.URL, tmpFile, false, s.RateLimit); err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
 	} else {
 		if s.Quiet < 2 {
 			fmt.Fprintf(os.Stderr, "downloading: %s (%s)\n", media.Filename, media.Name)
