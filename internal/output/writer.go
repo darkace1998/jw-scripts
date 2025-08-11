@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/allejok96/jwb-go/internal/api"
 	"github.com/allejok96/jwb-go/internal/config"
@@ -246,8 +245,7 @@ func sortMedia(mediaList []*api.Media, sortKey string) {
 			return mediaList[i].Date < mediaList[j].Date
 		})
 	case "random":
-		// Seed the random number generator for reproducible results during the same session
-		rand.Seed(time.Now().UnixNano())
+		// Use the global random number generator (automatically seeded in Go 1.20+)
 		rand.Shuffle(len(mediaList), func(i, j int) {
 			mediaList[i], mediaList[j] = mediaList[j], mediaList[i]
 		})
