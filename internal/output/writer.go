@@ -160,14 +160,16 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 }
 
 func getDefaultExtension(mode string) string {
-	if strings.HasPrefix(mode, "txt") {
+	switch {
+	case strings.HasPrefix(mode, "txt"):
 		return "txt"
-	} else if strings.HasPrefix(mode, "m3u") {
+	case strings.HasPrefix(mode, "m3u"):
 		return "m3u"
-	} else if strings.HasPrefix(mode, "html") {
+	case strings.HasPrefix(mode, "html"):
 		return "html"
+	default:
+		return "txt"
 	}
-	return "txt"
 }
 
 func outputFilesystem(s *config.Settings, data []*api.Category) error {
