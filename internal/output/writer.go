@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"html"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/allejok96/jwb-go/internal/api"
 	"github.com/allejok96/jwb-go/internal/config"
@@ -88,8 +90,85 @@ func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error
 }
 
 func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error {
-	// TODO: Implement multi output
+	for _, category := range data {
+		var categoryMedia []*api.Media
+		for _, item := range category.Contents {
+			if media, ok := item.(*api.Media); ok {
+				categoryMedia = append(categoryMedia, media)
+			}
+		}
+		
+		if len(categoryMedia) == 0 {
+			continue
+		}
+		
+		sortMedia(categoryMedia, s.Sort)
+		
+		// Create separate output file for each category
+		originalFilename := s.OutputFilename
+		if originalFilename == "" {
+			s.OutputFilename = fmt.Sprintf("%s.%s", category.Key, getDefaultExtension(s.Mode))
+		} else {
+			ext := filepath.Ext(originalFilename)
+			base := strings.TrimSuffix(originalFilename, ext)
+			s.OutputFilename = fmt.Sprintf("%s_%s%s", base, category.Key, ext)
+		}
+		
+		// Create new writer for this category
+		var categoryWriter Writer
+		var err error
+		
+		switch {
+		case strings.HasPrefix(s.Mode, "txt"):
+			categoryWriter, err = NewTxtWriter(s)
+		case strings.HasPrefix(s.Mode, "m3u"):
+			categoryWriter, err = NewM3uWriter(s)
+		case strings.HasPrefix(s.Mode, "html"):
+			categoryWriter, err = NewHTMLWriter(s)
+		default:
+			// For stdout and run modes, we can't really do "multi" so just use single output
+			s.OutputFilename = originalFilename
+			return outputSingle(s, data, writer)
+		}
+		
+		if err != nil {
+			s.OutputFilename = originalFilename
+			return err
+		}
+		
+		for _, media := range categoryMedia {
+			source := media.URL
+			if fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
+				source = filepath.Join(".", s.SubDir, media.Filename)
+			}
+			categoryWriter.Add(PlaylistEntry{
+				Name:     media.Name,
+				Source:   source,
+				Duration: int(math.Round(media.Duration)),
+			})
+		}
+		
+		if err := categoryWriter.Dump(); err != nil {
+			s.OutputFilename = originalFilename
+			return err
+		}
+		
+		// Restore original filename
+		s.OutputFilename = originalFilename
+	}
+	
 	return nil
+}
+
+func getDefaultExtension(mode string) string {
+	if strings.HasPrefix(mode, "txt") {
+		return "txt"
+	} else if strings.HasPrefix(mode, "m3u") {
+		return "m3u"
+	} else if strings.HasPrefix(mode, "html") {
+		return "html"
+	}
+	return "txt"
 }
 
 func outputFilesystem(s *config.Settings, data []*api.Category) error {
@@ -167,7 +246,11 @@ func sortMedia(mediaList []*api.Media, sortKey string) {
 			return mediaList[i].Date < mediaList[j].Date
 		})
 	case "random":
-		// TODO: Implement random sort
+		// Seed the random number generator for reproducible results during the same session
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(mediaList), func(i, j int) {
+			mediaList[i], mediaList[j] = mediaList[j], mediaList[i]
+		})
 	}
 }
 
