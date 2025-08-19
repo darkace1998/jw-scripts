@@ -175,6 +175,13 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 			media.Filename = getFilename(media.URL, c.settings.SafeFilenames)
 			media.FriendlyName = getFriendlyFilename(media.Name, media.URL, c.settings.SafeFilenames)
 			media.SubtitleFilename = getFilename(media.SubtitleURL, c.settings.SafeFilenames)
+			media.FriendlySubtitleFilename = getFriendlySubtitleFilename(media.Name, media.SubtitleURL, c.settings.SafeFilenames)
+
+			// Use friendly filenames if requested
+			if c.settings.FriendlyFilenames {
+				media.Filename = media.FriendlyName
+				media.SubtitleFilename = media.FriendlySubtitleFilename
+			}
 
 			if c.settings.Update {
 				var pcat *Category
@@ -261,6 +268,13 @@ func getFriendlyFilename(name, url string, safe bool) string {
 		return ""
 	}
 	return formatFilename(name+filepath.Ext(url), safe)
+}
+
+func getFriendlySubtitleFilename(name, subtitleURL string, safe bool) string {
+	if subtitleURL == "" {
+		return ""
+	}
+	return formatFilename(name+filepath.Ext(subtitleURL), safe)
 }
 
 func contains(slice []string, item string) bool {
