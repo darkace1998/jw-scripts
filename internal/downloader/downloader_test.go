@@ -203,7 +203,7 @@ func TestThrottledReaderRestart(t *testing.T) {
 func TestDownloadAllWithSubtitlesFlag(t *testing.T) {
 	// Test that DownloadSubtitles flag enables both subtitle and media downloads
 	// This is a minimal test that ensures the condition logic works correctly
-	
+
 	// Create test data structure
 	testData := []*api.Category{
 		{
@@ -220,7 +220,7 @@ func TestDownloadAllWithSubtitlesFlag(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Test case 1: DownloadSubtitles=true, Download=false should proceed to media download
 	settings1 := &config.Settings{
 		DownloadSubtitles: true,
@@ -229,21 +229,21 @@ func TestDownloadAllWithSubtitlesFlag(t *testing.T) {
 		SubDir:            "test",
 		Quiet:             2, // Silent
 	}
-	
-	// Since we can't actually download files in unit tests, we just verify the function 
+
+	// Since we can't actually download files in unit tests, we just verify the function
 	// doesn't return early. The real validation would require integration tests.
 	// For now, we test that it reaches the media download section by checking it doesn't
 	// return nil immediately.
-	
+
 	// We can test this by creating a temporary directory and seeing if it gets created
 	// This indirectly tests that the function proceeds past the early return
 	tmpDir := "/tmp/test_download_all"
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
-	
+
 	settings1.WorkDir = tmpDir
-	
+
 	// This should not return early due to our fix
 	err := DownloadAll(settings1, testData)
 	// We expect it to fail later (during actual download) but not return early
@@ -255,7 +255,7 @@ func TestDownloadAllWithSubtitlesFlag(t *testing.T) {
 		}
 	}
 	// If there's an error, it should be from the download attempt, not early return
-	
+
 	// Test case 2: Both flags false should return early
 	settings2 := &config.Settings{
 		DownloadSubtitles: false,
@@ -264,7 +264,7 @@ func TestDownloadAllWithSubtitlesFlag(t *testing.T) {
 		SubDir:            "test",
 		Quiet:             2,
 	}
-	
+
 	err2 := DownloadAll(settings2, testData)
 	if err2 != nil {
 		t.Errorf("Expected DownloadAll to return nil when both Download and DownloadSubtitles are false, got: %v", err2)
