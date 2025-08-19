@@ -116,6 +116,47 @@ func TestGetFriendlyFilename(t *testing.T) {
 	}
 }
 
+func TestGetFriendlySubtitleFilename(t *testing.T) {
+	testCases := []struct {
+		name        string
+		n           string
+		subtitleURL string
+		safe        bool
+		want        string
+	}{
+		{
+			name:        "valid name and subtitle url",
+			n:           "My Awesome Video",
+			subtitleURL: "http://example.com/subtitle.vtt",
+			safe:        true,
+			want:        "My Awesome Video.vtt",
+		},
+		{
+			name:        "empty subtitle url",
+			n:           "My Awesome Video",
+			subtitleURL: "",
+			safe:        true,
+			want:        "",
+		},
+		{
+			name:        "name with special chars",
+			n:           "My:Awesome/Video",
+			subtitleURL: "http://example.com/subtitle.vtt",
+			safe:        true,
+			want:        "My.AwesomeVideo.vtt",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := getFriendlySubtitleFilename(tc.n, tc.subtitleURL, tc.safe)
+			if got != tc.want {
+				t.Errorf("getFriendlySubtitleFilename() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetFilename(t *testing.T) {
 	testCases := []struct {
 		name string
