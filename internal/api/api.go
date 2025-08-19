@@ -10,16 +10,17 @@ type Category struct {
 
 // Media represents a single media item, like a video or audio file.
 type Media struct {
-	Date             int64
-	Duration         float64
-	MD5              string
-	Name             string
-	Size             int64
-	SubtitleURL      string
-	URL              string
-	Filename         string
-	FriendlyName     string
-	SubtitleFilename string
+	Date                     int64
+	Duration                 float64
+	MD5                      string
+	Name                     string
+	Size                     int64
+	SubtitleURL              string
+	URL                      string
+	Filename                 string
+	FriendlyName             string
+	SubtitleFilename         string
+	FriendlySubtitleFilename string
 }
 
 // File represents a media file, like a video or audio file.
