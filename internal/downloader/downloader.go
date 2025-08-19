@@ -51,7 +51,7 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 		}
 	}
 
-	if !s.Download {
+	if !s.Download && !s.DownloadSubtitles {
 		return nil
 	}
 

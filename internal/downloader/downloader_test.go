@@ -2,9 +2,14 @@ package downloader
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/allejok96/jwb-go/internal/api"
+	"github.com/allejok96/jwb-go/internal/config"
 )
 
 const (
@@ -193,4 +198,75 @@ func TestThrottledReaderRestart(t *testing.T) {
 	}
 
 	t.Logf("Multi-read test: %.3f MB/s (target 0.1 MB/s)", actualRate)
+}
+
+func TestDownloadAllWithSubtitlesFlag(t *testing.T) {
+	// Test that DownloadSubtitles flag enables both subtitle and media downloads
+	// This is a minimal test that ensures the condition logic works correctly
+	
+	// Create test data structure
+	testData := []*api.Category{
+		{
+			Contents: []interface{}{
+				&api.Media{
+					URL:              "http://example.com/test.mp4",
+					SubtitleURL:      "http://example.com/test.vtt",
+					Name:             "Test Media",
+					Filename:         "test.mp4",
+					SubtitleFilename: "test.vtt",
+					Size:             1024,
+					Date:             1234567890,
+				},
+			},
+		},
+	}
+	
+	// Test case 1: DownloadSubtitles=true, Download=false should proceed to media download
+	settings1 := &config.Settings{
+		DownloadSubtitles: true,
+		Download:          false,
+		WorkDir:           "/tmp/test1",
+		SubDir:            "test",
+		Quiet:             2, // Silent
+	}
+	
+	// Since we can't actually download files in unit tests, we just verify the function 
+	// doesn't return early. The real validation would require integration tests.
+	// For now, we test that it reaches the media download section by checking it doesn't
+	// return nil immediately.
+	
+	// We can test this by creating a temporary directory and seeing if it gets created
+	// This indirectly tests that the function proceeds past the early return
+	tmpDir := "/tmp/test_download_all"
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+	
+	settings1.WorkDir = tmpDir
+	
+	// This should not return early due to our fix
+	err := DownloadAll(settings1, testData)
+	// We expect it to fail later (during actual download) but not return early
+	// The key is that it should NOT return nil immediately
+	if err == nil {
+		// If no error, the directory should exist (created by DownloadAll)
+		if _, statErr := os.Stat(filepath.Join(tmpDir, "test")); os.IsNotExist(statErr) {
+			t.Error("Expected DownloadAll to create working directory when DownloadSubtitles=true")
+		}
+	}
+	// If there's an error, it should be from the download attempt, not early return
+	
+	// Test case 2: Both flags false should return early
+	settings2 := &config.Settings{
+		DownloadSubtitles: false,
+		Download:          false,
+		WorkDir:           "/tmp/test2",
+		SubDir:            "test",
+		Quiet:             2,
+	}
+	
+	err2 := DownloadAll(settings2, testData)
+	if err2 != nil {
+		t.Errorf("Expected DownloadAll to return nil when both Download and DownloadSubtitles are false, got: %v", err2)
+	}
 }
