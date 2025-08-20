@@ -31,7 +31,8 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().BoolVar(&settings.Append, "append", false, "append to file instead of overwriting")
-	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", []string{"VideoOnDemand"}, "comma separated list of categories to index")
+	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", []string{"VideoOnDemand"}, "comma separated list of categories to index (use --list-categories-all to see available categories)")
+	rootCmd.Flags().BoolVar(&settings.ListCategories, "list-categories-all", false, "list all available root categories")
 	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")
 	rootCmd.Flags().BoolVar(&settings.CleanAllSymlinks, "clean-symlinks", false, "remove all old symlinks (mode=filesystem)")
 	rootCmd.Flags().StringSliceVar(&settings.Command, "command", []string{}, "command to execute in run mode")
@@ -75,6 +76,26 @@ func run(s *config.Settings) error {
 		fmt.Println("language codes:")
 		for _, l := range langs {
 			fmt.Printf("%3s  %s\n", l.Code, l.Name)
+		}
+		return nil
+	}
+
+	if s.ListCategories {
+		rootCategories, err := client.GetRootCategories()
+		if err != nil {
+			return fmt.Errorf("failed to get root categories: %v", err)
+		}
+
+		fmt.Println("Available root categories:")
+		for _, cat := range rootCategories {
+			catResp, err := client.GetCategory(s.Lang, cat)
+			if err != nil {
+				if s.Quiet < 2 {
+					fmt.Printf("  %s (could not fetch details)\n", cat)
+				}
+			} else {
+				fmt.Printf("  %s (%s)\n", catResp.Category.Name, cat)
+			}
 		}
 		return nil
 	}

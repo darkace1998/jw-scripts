@@ -17,6 +17,7 @@ type Settings struct {
 	ExcludeCategories []string
 	FilterCategories  []string
 	PrintCategory     string
+	ListCategories    bool // flag to indicate --category with no args should list categories
 	Latest            bool
 	KeepFree          int64
 	Warning           bool

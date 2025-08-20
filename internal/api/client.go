@@ -55,6 +55,61 @@ func (c *Client) GetLanguages() ([]Language, error) {
 	return langResp.Languages, nil
 }
 
+// GetRootCategories fetches all available root categories from the API.
+func (c *Client) GetRootCategories() ([]string, error) {
+	url := fmt.Sprintf("%s/categories/%s/?detailed=1", c.baseURL, c.settings.Lang)
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get root categories: %s", resp.Status)
+	}
+
+	var rootResp RootCategoriesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&rootResp); err != nil {
+		return nil, err
+	}
+
+	// Filter categories that are likely to be user-accessible root categories
+	// We'll use a more sophisticated approach: include categories that either
+	// 1. Don't have major exclude tags, OR
+	// 2. Are commonly useful categories even if they have some exclude tags
+	var categories []string
+	majorExcludeTags := map[string]bool{
+		"WebExclude":   true,
+		"JWORGExclude": true,
+	}
+
+	// Known useful categories that might have some exclude tags but are still valuable
+	knownUseful := map[string]bool{
+		"Audio": true,
+	}
+
+	for _, cat := range rootResp.Categories {
+		// Check if this category has major exclude tags
+		hasMajorExclude := false
+		for _, tag := range cat.Tags {
+			if majorExcludeTags[tag] {
+				hasMajorExclude = true
+				break
+			}
+		}
+
+		// Include if it's a container/ondemand type AND either:
+		// - Doesn't have major exclude tags, OR
+		// - Is in the known useful list
+		if (cat.Type == "container" || cat.Type == "ondemand") &&
+			(!hasMajorExclude || knownUseful[cat.Key]) {
+			categories = append(categories, cat.Key)
+		}
+	}
+
+	return categories, nil
+}
+
 // GetCategory fetches a category by its key.
 func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
 	url := fmt.Sprintf("%s/categories/%s/%s?detailed=1", c.baseURL, lang, key)
@@ -84,6 +139,10 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 	var result []*Category
 
 	processed := make(map[string]bool)
+
+	// Track used filenames to prevent duplicates
+	usedFilenames := make(map[string]bool)
+	usedSubtitleFilenames := make(map[string]bool)
 
 	for len(queue) > 0 {
 		key := queue[0]
@@ -177,10 +236,14 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 			media.SubtitleFilename = getFilename(media.SubtitleURL, c.settings.SafeFilenames)
 			media.FriendlySubtitleFilename = getFriendlySubtitleFilename(media.Name, media.SubtitleURL, c.settings.SafeFilenames)
 
-			// Use friendly filenames if requested
+			// Use friendly filenames if requested and ensure uniqueness
 			if c.settings.FriendlyFilenames {
-				media.Filename = media.FriendlyName
-				media.SubtitleFilename = media.FriendlySubtitleFilename
+				media.Filename = makeUniqueFilename(media.FriendlyName, usedFilenames)
+				media.SubtitleFilename = makeUniqueFilename(media.FriendlySubtitleFilename, usedSubtitleFilenames)
+			} else {
+				// Even for non-friendly filenames, ensure uniqueness to prevent overwrites
+				media.Filename = makeUniqueFilename(media.Filename, usedFilenames)
+				media.SubtitleFilename = makeUniqueFilename(media.SubtitleFilename, usedSubtitleFilenames)
 			}
 
 			if c.settings.Update {
@@ -243,7 +306,7 @@ func formatFilename(s string, safe bool) string {
 	var forbidden string
 	if safe {
 		s = strings.ReplaceAll(s, `"`, "'")
-		s = strings.ReplaceAll(s, ":", ".")
+		s = strings.ReplaceAll(s, ":", "-") // Use dash instead of dot for colons
 		forbidden = "<>|?\\*/\x00\n"
 	} else {
 		forbidden = "/\x00"
@@ -275,6 +338,27 @@ func getFriendlySubtitleFilename(name, subtitleURL string, safe bool) string {
 		return ""
 	}
 	return formatFilename(name+filepath.Ext(subtitleURL), safe)
+}
+
+// makeUniqueFilename ensures filename is unique by appending a number if needed
+func makeUniqueFilename(filename string, usedFilenames map[string]bool) string {
+	if filename == "" {
+		return ""
+	}
+
+	originalFilename := filename
+	counter := 1
+
+	// Keep trying until we find a unique filename
+	for usedFilenames[filename] {
+		ext := filepath.Ext(originalFilename)
+		nameWithoutExt := strings.TrimSuffix(originalFilename, ext)
+		filename = fmt.Sprintf("%s (%d)%s", nameWithoutExt, counter, ext)
+		counter++
+	}
+
+	usedFilenames[filename] = true
+	return filename
 }
 
 func contains(slice []string, item string) bool {
