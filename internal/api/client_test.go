@@ -340,12 +340,12 @@ func TestMakeUniqueFilename(t *testing.T) {
 			for k, v := range tc.usedFilenames {
 				usedFilenames[k] = v
 			}
-			
+
 			got := makeUniqueFilename(tc.filename, usedFilenames)
 			if got != tc.want {
 				t.Errorf("makeUniqueFilename() = %q, want %q", got, tc.want)
 			}
-			
+
 			// Verify the filename was added to the used map
 			if tc.filename != "" && !usedFilenames[got] {
 				t.Errorf("makeUniqueFilename() did not add %q to usedFilenames map", got)

@@ -84,7 +84,7 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 	var result []*Category
 
 	processed := make(map[string]bool)
-	
+
 	// Track used filenames to prevent duplicates
 	usedFilenames := make(map[string]bool)
 	usedSubtitleFilenames := make(map[string]bool)
@@ -290,10 +290,10 @@ func makeUniqueFilename(filename string, usedFilenames map[string]bool) string {
 	if filename == "" {
 		return ""
 	}
-	
+
 	originalFilename := filename
 	counter := 1
-	
+
 	// Keep trying until we find a unique filename
 	for usedFilenames[filename] {
 		ext := filepath.Ext(originalFilename)
@@ -301,7 +301,7 @@ func makeUniqueFilename(filename string, usedFilenames map[string]bool) string {
 		filename = fmt.Sprintf("%s (%d)%s", nameWithoutExt, counter, ext)
 		counter++
 	}
-	
+
 	usedFilenames[filename] = true
 	return filename
 }
