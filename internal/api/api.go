@@ -68,3 +68,14 @@ type CategoryResponse struct {
 		} `json:"media"`
 	} `json:"category"`
 }
+
+// RootCategoriesResponse is the response from the root categories API endpoint.
+type RootCategoriesResponse struct {
+	Categories []struct {
+		Key         string   `json:"key"`
+		Type        string   `json:"type"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Tags        []string `json:"tags"`
+	} `json:"categories"`
+}

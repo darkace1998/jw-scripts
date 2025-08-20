@@ -81,7 +81,11 @@ func run(s *config.Settings) error {
 	}
 
 	if s.ListCategories {
-		rootCategories := []string{"VideoOnDemand", "Bible", "Publications", "Meetings", "Movies", "Music", "MysteryBox", "SundayWorship", "Interviews", "AudioDrama"}
+		rootCategories, err := client.GetRootCategories()
+		if err != nil {
+			return fmt.Errorf("failed to get root categories: %v", err)
+		}
+
 		fmt.Println("Available root categories:")
 		for _, cat := range rootCategories {
 			catResp, err := client.GetCategory(s.Lang, cat)

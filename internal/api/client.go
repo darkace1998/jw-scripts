@@ -55,6 +55,61 @@ func (c *Client) GetLanguages() ([]Language, error) {
 	return langResp.Languages, nil
 }
 
+// GetRootCategories fetches all available root categories from the API.
+func (c *Client) GetRootCategories() ([]string, error) {
+	url := fmt.Sprintf("%s/categories/%s/?detailed=1", c.baseURL, c.settings.Lang)
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get root categories: %s", resp.Status)
+	}
+
+	var rootResp RootCategoriesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&rootResp); err != nil {
+		return nil, err
+	}
+
+	// Filter categories that are likely to be user-accessible root categories
+	// We'll use a more sophisticated approach: include categories that either
+	// 1. Don't have major exclude tags, OR
+	// 2. Are commonly useful categories even if they have some exclude tags
+	var categories []string
+	majorExcludeTags := map[string]bool{
+		"WebExclude":   true,
+		"JWORGExclude": true,
+	}
+
+	// Known useful categories that might have some exclude tags but are still valuable
+	knownUseful := map[string]bool{
+		"Audio": true,
+	}
+
+	for _, cat := range rootResp.Categories {
+		// Check if this category has major exclude tags
+		hasMajorExclude := false
+		for _, tag := range cat.Tags {
+			if majorExcludeTags[tag] {
+				hasMajorExclude = true
+				break
+			}
+		}
+
+		// Include if it's a container/ondemand type AND either:
+		// - Doesn't have major exclude tags, OR
+		// - Is in the known useful list
+		if (cat.Type == "container" || cat.Type == "ondemand") &&
+			(!hasMajorExclude || knownUseful[cat.Key]) {
+			categories = append(categories, cat.Key)
+		}
+	}
+
+	return categories, nil
+}
+
 // GetCategory fetches a category by its key.
 func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
 	url := fmt.Sprintf("%s/categories/%s/%s?detailed=1", c.baseURL, lang, key)
