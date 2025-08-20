@@ -84,6 +84,10 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 	var result []*Category
 
 	processed := make(map[string]bool)
+	
+	// Track used filenames to prevent duplicates
+	usedFilenames := make(map[string]bool)
+	usedSubtitleFilenames := make(map[string]bool)
 
 	for len(queue) > 0 {
 		key := queue[0]
@@ -177,10 +181,14 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 			media.SubtitleFilename = getFilename(media.SubtitleURL, c.settings.SafeFilenames)
 			media.FriendlySubtitleFilename = getFriendlySubtitleFilename(media.Name, media.SubtitleURL, c.settings.SafeFilenames)
 
-			// Use friendly filenames if requested
+			// Use friendly filenames if requested and ensure uniqueness
 			if c.settings.FriendlyFilenames {
-				media.Filename = media.FriendlyName
-				media.SubtitleFilename = media.FriendlySubtitleFilename
+				media.Filename = makeUniqueFilename(media.FriendlyName, usedFilenames)
+				media.SubtitleFilename = makeUniqueFilename(media.FriendlySubtitleFilename, usedSubtitleFilenames)
+			} else {
+				// Even for non-friendly filenames, ensure uniqueness to prevent overwrites
+				media.Filename = makeUniqueFilename(media.Filename, usedFilenames)
+				media.SubtitleFilename = makeUniqueFilename(media.SubtitleFilename, usedSubtitleFilenames)
 			}
 
 			if c.settings.Update {
@@ -243,7 +251,7 @@ func formatFilename(s string, safe bool) string {
 	var forbidden string
 	if safe {
 		s = strings.ReplaceAll(s, `"`, "'")
-		s = strings.ReplaceAll(s, ":", ".")
+		s = strings.ReplaceAll(s, ":", "-") // Use dash instead of dot for colons
 		forbidden = "<>|?\\*/\x00\n"
 	} else {
 		forbidden = "/\x00"
@@ -275,6 +283,27 @@ func getFriendlySubtitleFilename(name, subtitleURL string, safe bool) string {
 		return ""
 	}
 	return formatFilename(name+filepath.Ext(subtitleURL), safe)
+}
+
+// makeUniqueFilename ensures filename is unique by appending a number if needed
+func makeUniqueFilename(filename string, usedFilenames map[string]bool) string {
+	if filename == "" {
+		return ""
+	}
+	
+	originalFilename := filename
+	counter := 1
+	
+	// Keep trying until we find a unique filename
+	for usedFilenames[filename] {
+		ext := filepath.Ext(originalFilename)
+		nameWithoutExt := strings.TrimSuffix(originalFilename, ext)
+		filename = fmt.Sprintf("%s (%d)%s", nameWithoutExt, counter, ext)
+		counter++
+	}
+	
+	usedFilenames[filename] = true
+	return filename
 }
 
 func contains(slice []string, item string) bool {

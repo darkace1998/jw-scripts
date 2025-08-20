@@ -102,7 +102,7 @@ func TestGetFriendlyFilename(t *testing.T) {
 			n:    "My:Awesome/Video",
 			url:  "http://example.com/video.mp4",
 			safe: true,
-			want: "My.AwesomeVideo.mp4",
+			want: "My-AwesomeVideo.mp4",
 		},
 	}
 
@@ -143,7 +143,7 @@ func TestGetFriendlySubtitleFilename(t *testing.T) {
 			n:           "My:Awesome/Video",
 			subtitleURL: "http://example.com/subtitle.vtt",
 			safe:        true,
-			want:        "My.AwesomeVideo.vtt",
+			want:        "My-AwesomeVideo.vtt",
 		},
 	}
 
@@ -223,7 +223,7 @@ func TestFormatFilename(t *testing.T) {
 			name: "safe mode with quotes and colons",
 			s:    `a"b:c.txt`,
 			safe: true,
-			want: "a'b.c.txt",
+			want: "a'b-c.txt",
 		},
 	}
 
@@ -282,6 +282,73 @@ func TestParseDate(t *testing.T) {
 			}
 			if !tc.expectErr && !got.Equal(tc.want) {
 				t.Errorf("parseDate() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMakeUniqueFilename(t *testing.T) {
+	testCases := []struct {
+		name          string
+		filename      string
+		usedFilenames map[string]bool
+		want          string
+	}{
+		{
+			name:          "unique filename",
+			filename:      "video.mp4",
+			usedFilenames: make(map[string]bool),
+			want:          "video.mp4",
+		},
+		{
+			name:     "duplicate filename",
+			filename: "video.mp4",
+			usedFilenames: map[string]bool{
+				"video.mp4": true,
+			},
+			want: "video (1).mp4",
+		},
+		{
+			name:     "multiple duplicates",
+			filename: "video.mp4",
+			usedFilenames: map[string]bool{
+				"video.mp4":     true,
+				"video (1).mp4": true,
+			},
+			want: "video (2).mp4",
+		},
+		{
+			name:          "empty filename",
+			filename:      "",
+			usedFilenames: make(map[string]bool),
+			want:          "",
+		},
+		{
+			name:     "filename without extension",
+			filename: "video",
+			usedFilenames: map[string]bool{
+				"video": true,
+			},
+			want: "video (1)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Make a copy of the map to avoid modifying the test case
+			usedFilenames := make(map[string]bool)
+			for k, v := range tc.usedFilenames {
+				usedFilenames[k] = v
+			}
+			
+			got := makeUniqueFilename(tc.filename, usedFilenames)
+			if got != tc.want {
+				t.Errorf("makeUniqueFilename() = %q, want %q", got, tc.want)
+			}
+			
+			// Verify the filename was added to the used map
+			if tc.filename != "" && !usedFilenames[got] {
+				t.Errorf("makeUniqueFilename() did not add %q to usedFilenames map", got)
 			}
 		})
 	}
