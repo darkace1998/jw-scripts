@@ -145,6 +145,20 @@ func TestGetFriendlySubtitleFilename(t *testing.T) {
 			safe:        true,
 			want:        "My-AwesomeVideo.vtt",
 		},
+		{
+			name:        "url without extension",
+			n:           "My Awesome Video",
+			subtitleURL: "http://example.com/subtitle123",
+			safe:        true,
+			want:        "My Awesome Video.vtt",
+		},
+		{
+			name:        "url with query params but no extension",
+			n:           "My Video",
+			subtitleURL: "http://example.com/clip.php?id=123",
+			safe:        true,
+			want:        "My Video.vtt",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -152,6 +166,55 @@ func TestGetFriendlySubtitleFilename(t *testing.T) {
 			got := getFriendlySubtitleFilename(tc.n, tc.subtitleURL, tc.safe)
 			if got != tc.want {
 				t.Errorf("getFriendlySubtitleFilename() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGetSubtitleFilename(t *testing.T) {
+	testCases := []struct {
+		name string
+		url  string
+		safe bool
+		want string
+	}{
+		{
+			name: "valid vtt url",
+			url:  "http://example.com/subtitle.vtt",
+			safe: true,
+			want: "subtitle.vtt",
+		},
+		{
+			name: "url without extension",
+			url:  "http://example.com/subtitle123",
+			safe: true,
+			want: "subtitle123.vtt",
+		},
+		{
+			name: "empty url",
+			url:  "",
+			safe: true,
+			want: "",
+		},
+		{
+			name: "url with query params but no extension",
+			url:  "http://example.com/clip.php?id=123",
+			safe: true,
+			want: "clip.phpid=123.vtt",
+		},
+		{
+			name: "url with different extension",
+			url:  "http://example.com/subtitle.txt",
+			safe: true,
+			want: "subtitle.txt.vtt",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := getSubtitleFilename(tc.url, tc.safe)
+			if got != tc.want {
+				t.Errorf("getSubtitleFilename() = %q, want %q", got, tc.want)
 			}
 		})
 	}

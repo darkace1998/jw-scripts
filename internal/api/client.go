@@ -233,7 +233,7 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 
 			media.Filename = getFilename(media.URL, c.settings.SafeFilenames)
 			media.FriendlyName = getFriendlyFilename(media.Name, media.URL, c.settings.SafeFilenames)
-			media.SubtitleFilename = getFilename(media.SubtitleURL, c.settings.SafeFilenames)
+			media.SubtitleFilename = getSubtitleFilename(media.SubtitleURL, c.settings.SafeFilenames)
 			media.FriendlySubtitleFilename = getFriendlySubtitleFilename(media.Name, media.SubtitleURL, c.settings.SafeFilenames)
 
 			// Use friendly filenames if requested and ensure uniqueness
@@ -326,6 +326,20 @@ func getFilename(url string, safe bool) string {
 	return formatFilename(filepath.Base(url), safe)
 }
 
+func getSubtitleFilename(url string, safe bool) string {
+	if url == "" {
+		return ""
+	}
+	filename := filepath.Base(url)
+	ext := filepath.Ext(filename)
+	// Only use the extension if it's a valid subtitle extension (.vtt)
+	// Otherwise, add .vtt for subtitle files
+	if ext != ".vtt" {
+		filename += ".vtt"
+	}
+	return formatFilename(filename, safe)
+}
+
 func getFriendlyFilename(name, url string, safe bool) string {
 	if url == "" {
 		return ""
@@ -337,7 +351,13 @@ func getFriendlySubtitleFilename(name, subtitleURL string, safe bool) string {
 	if subtitleURL == "" {
 		return ""
 	}
-	return formatFilename(name+filepath.Ext(subtitleURL), safe)
+	ext := filepath.Ext(subtitleURL)
+	// Only use the extension if it's a valid subtitle extension (.vtt)
+	// Otherwise, default to .vtt for subtitle files
+	if ext != ".vtt" {
+		ext = ".vtt"
+	}
+	return formatFilename(name+ext, safe)
 }
 
 // makeUniqueFilename ensures filename is unique by appending a number if needed
