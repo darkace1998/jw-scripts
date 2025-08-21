@@ -115,9 +115,16 @@ func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory 
 		if s.Quiet < 2 {
 			fmt.Fprintf(os.Stderr, "[%d/%d] downloading: %s\n", i+1, len(queue), media.SubtitleFilename)
 		}
-		if err := DownloadFile(s, media.SubtitleURL, filepath.Join(directory, media.SubtitleFilename), false, 0); err != nil {
+		subtitlePath := filepath.Join(directory, media.SubtitleFilename)
+		if err := DownloadFile(s, media.SubtitleURL, subtitlePath, false, 0); err != nil {
 			if s.Quiet < 2 {
 				fmt.Fprintf(os.Stderr, "failed to download subtitle %s: %v\n", media.SubtitleFilename, err)
+			}
+			// Clean up any empty or partial files created during failed download
+			if fi, statErr := os.Stat(subtitlePath); statErr == nil && fi.Size() == 0 {
+				if removeErr := os.Remove(subtitlePath); removeErr != nil && s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "failed to clean up empty file %s: %v\n", media.SubtitleFilename, removeErr)
+				}
 			}
 		}
 	}
