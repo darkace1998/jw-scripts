@@ -2,9 +2,11 @@
 
 *These methods of acessing jw.org are, while legal, not officially supported by the organisation. Use them if you find it worth the time, pain and risk. But first, please take the time to read [w18.04 30-31](https://wol.jw.org/en/wol/d/r1/lp-e/2018364). Then consider buing a device which has official support for JW Broadcasting app. Like a Roku, Apple TV or Amazon Fire TV. It will give you a better and safer experience.*
 
-### JW Broadcasting and sound recordings anywhere
+### JW Broadcasting and Publications anywhere
 
-With these scripts you can get the latest JW Broadcasting videos automatically downloaded to your Plex library. You can turn a computer (like a Raspberry Pi) into a JW TV, either by streaming directly, or by playing downloaded videos from your collection.
+With these scripts you can get the latest JW Broadcasting videos and publications automatically downloaded. You can turn a computer (like a Raspberry Pi) into a JW TV, either by streaming directly, or by playing downloaded videos from your collection.
+
+**Note**: The publication download feature (`jwb-books`) is currently a framework implementation. The JW.org API does not currently provide access to publications/books - only broadcasting content (videos and audio). See [docs/BOOK_DOWNLOAD_ANALYSIS.md](docs/BOOK_DOWNLOAD_ANALYSIS.md) for details.
 
 ## Get started
 
@@ -39,6 +41,8 @@ This will create the executables in a `bin` directory.
 
 ### Running the applications
 
+#### JW Broadcasting Videos and Audio
+
 For example, to download the latest videos in Swedish, you would run:
 
 ```bash
@@ -50,6 +54,29 @@ To play downloaded videos, you can use the `jwb-offline` command:
 ```bash
 ./bin/jwb-offline /path/to/your/videos
 ```
+
+#### JW Publications (Books, Magazines) - Framework Implementation
+
+**Note**: This feature is currently a framework implementation as the JW.org API does not provide access to publications.
+
+```bash
+# Check API status and limitations
+./bin/jwb-books
+
+# List available book categories (when API becomes available)
+./bin/jwb-books --list-categories
+
+# Download books by category in PDF format (when API becomes available)  
+./bin/jwb-books --category=bible-study --format=pdf --output=./books
+
+# Download magazines in EPUB format (when API becomes available)
+./bin/jwb-books --category=magazines --format=epub --output=./publications
+
+# Search for specific publications (when API becomes available)
+./bin/jwb-books --search="watchtower 2024"
+```
+
+See [docs/BOOK_DOWNLOAD_ANALYSIS.md](docs/BOOK_DOWNLOAD_ANALYSIS.md) for detailed information about the API analysis and framework implementation.
 
 Next, check out the [Wiki pages](https://github.com/allejok96/jw-scripts/wiki) for more examples and options. The command-line flags are the same as the original Python version.
 
