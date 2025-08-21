@@ -19,9 +19,9 @@ func main() {
 		if safeFilenames {
 			platform = "Windows-like"
 		}
-		
+
 		fmt.Printf("\n=== Testing %s (SafeFilenames=%t) ===\n", platform, safeFilenames)
-		
+
 		settings := &config.Settings{
 			Lang:              "E",
 			IncludeCategories: []string{"VideoOnDemand"},
@@ -54,23 +54,24 @@ func main() {
 		var emptyFilenames int
 
 		for _, media := range mediaList {
-			if media.SubtitleURL != "" {
-				// This mimics the logic in downloadAllSubtitles
-				filename := media.SubtitleFilename
-				
-				if filename == "" {
-					emptyFilenames++
-					continue // Skip if filename generation failed
-				}
-				
-				if seenFilenames[filename] {
-					skippedDueToCollision++
-					continue // Skip if we've seen this filename before
-				}
-				
-				seenFilenames[filename] = true
-				subtitleQueue = append(subtitleQueue, media)
+			if media.SubtitleURL == "" {
+				continue
 			}
+			// This mimics the logic in downloadAllSubtitles
+			filename := media.SubtitleFilename
+
+			if filename == "" {
+				emptyFilenames++
+				continue // Skip if filename generation failed
+			}
+
+			if seenFilenames[filename] {
+				skippedDueToCollision++
+				continue // Skip if we've seen this filename before
+			}
+
+			seenFilenames[filename] = true
+			subtitleQueue = append(subtitleQueue, media)
 		}
 
 		fmt.Printf("Total media items: %d\n", len(mediaList))
@@ -79,12 +80,12 @@ func main() {
 		fmt.Printf("Media skipped due to filename collisions: %d\n", skippedDueToCollision)
 		fmt.Printf("Final subtitle download queue: %d\n", len(subtitleQueue))
 		fmt.Printf("Unique subtitle filenames: %d\n", len(seenFilenames))
-		
+
 		if emptyFilenames > 0 || skippedDueToCollision > 0 {
-			fmt.Printf("*** POTENTIAL ISSUE: %d subtitles would be lost! ***\n", emptyFilenames + skippedDueToCollision)
+			fmt.Printf("*** POTENTIAL ISSUE: %d subtitles would be lost! ***\n", emptyFilenames+skippedDueToCollision)
 		}
 	}
-	
+
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("If the counts differ significantly between Windows-like and Linux-like,")
 	fmt.Println("this explains the discrepancy the user reported!")

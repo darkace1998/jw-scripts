@@ -45,54 +45,54 @@ func main() {
 		for _, item := range cat.Contents {
 			if media, ok := item.(*api.Media); ok {
 				totalMedia++
-				
+
 				if media.SubtitleURL != "" {
 					// Test filename generation with both safe and unsafe modes
 					safeName := formatFilename(media.Name+".vtt", true)
 					unsafeName := formatFilename(media.Name+".vtt", false)
-					
+
 					safeSubtitleFilename := getSubtitleFilenameSafe(media.SubtitleURL, true)
 					unsafeSubtitleFilename := getSubtitleFilenameSafe(media.SubtitleURL, false)
-					
+
 					// Track filename collisions
 					filenameMapSafe[safeName]++
 					filenameMapUnsafe[unsafeName]++
-					
+
 					// Check for problematic characters
 					problematicChars := []rune{}
-					
+
 					for _, r := range media.Name + media.SubtitleURL {
 						characterStats[r]++
-						
+
 						// Check for characters that would be filtered in safe mode
 						if strings.ContainsRune(`<>|?\\*/`, r) || r == '\x00' || r == '\n' {
 							problematicChars = append(problematicChars, r)
 						}
 					}
-					
+
 					// Check if safe vs unsafe processing creates different results
 					if safeName != unsafeName || safeSubtitleFilename != unsafeSubtitleFilename {
 						problematicMedia = append(problematicMedia, ProblematicItem{
-							Name: media.Name,
-							SubtitleURL: media.SubtitleURL,
-							SafeName: safeName,
-							UnsafeName: unsafeName,
-							SafeSubtitleFilename: safeSubtitleFilename,
+							Name:                   media.Name,
+							SubtitleURL:            media.SubtitleURL,
+							SafeName:               safeName,
+							UnsafeName:             unsafeName,
+							SafeSubtitleFilename:   safeSubtitleFilename,
 							UnsafeSubtitleFilename: unsafeSubtitleFilename,
-							ProblematicChars: string(problematicChars),
+							ProblematicChars:       string(problematicChars),
 						})
 					}
-					
+
 					// Check for empty filenames after processing
 					if safeName == "" || unsafeName == "" || safeSubtitleFilename == "" || unsafeSubtitleFilename == "" {
 						problematicMedia = append(problematicMedia, ProblematicItem{
-							Name: media.Name + " [EMPTY_FILENAME]",
-							SubtitleURL: media.SubtitleURL,
-							SafeName: safeName,
-							UnsafeName: unsafeName,
-							SafeSubtitleFilename: safeSubtitleFilename,
+							Name:                   media.Name + " [EMPTY_FILENAME]",
+							SubtitleURL:            media.SubtitleURL,
+							SafeName:               safeName,
+							UnsafeName:             unsafeName,
+							SafeSubtitleFilename:   safeSubtitleFilename,
 							UnsafeSubtitleFilename: unsafeSubtitleFilename,
-							ProblematicChars: "EMPTY_RESULT",
+							ProblematicChars:       "EMPTY_RESULT",
 						})
 					}
 				}
@@ -105,18 +105,18 @@ func main() {
 		if count > 1 {
 			filenameCollisions = append(filenameCollisions, FilenameCollision{
 				Filename: filename,
-				Count: count,
-				Mode: "safe",
+				Count:    count,
+				Mode:     "safe",
 			})
 		}
 	}
-	
+
 	for filename, count := range filenameMapUnsafe {
 		if count > 1 {
 			filenameCollisions = append(filenameCollisions, FilenameCollision{
 				Filename: filename,
-				Count: count,
-				Mode: "unsafe",
+				Count:    count,
+				Mode:     "unsafe",
 			})
 		}
 	}
@@ -163,40 +163,53 @@ func main() {
 
 	// Save analysis results
 	analysis := map[string]interface{}{
-		"total_media": totalMedia,
-		"problematic_items": len(problematicMedia),
+		"total_media":         totalMedia,
+		"problematic_items":   len(problematicMedia),
 		"filename_collisions": len(filenameCollisions),
-		"problematic_samples": problematicMedia[:min(len(problematicMedia), 50)],
-		"collision_samples": filenameCollisions[:min(len(filenameCollisions), 50)],
-		"character_stats": characterStats,
+		"problematic_samples": problematicMedia[:minInt(len(problematicMedia), 50)],
+		"collision_samples":   filenameCollisions[:minInt(len(filenameCollisions), 50)],
+		"character_stats":     characterStats,
 	}
 
 	jsonData, _ := json.MarshalIndent(analysis, "", "  ")
-	err = os.WriteFile("/tmp/character_analysis.json", jsonData, 0644)
+	tmpFile, err := os.CreateTemp("", "character_analysis_*.json")
+	if err != nil {
+		fmt.Printf("Warning: could not create temp file: %v\n", err)
+		return
+	}
+	defer func() {
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
+		}
+	}()
+
+	err = os.WriteFile(tmpFile.Name(), jsonData, 0o600)
 	if err != nil {
 		fmt.Printf("Warning: could not save analysis data: %v\n", err)
 	} else {
-		fmt.Println("\nAnalysis data saved to /tmp/character_analysis.json")
+		fmt.Printf("\nAnalysis data saved to %s\n", tmpFile.Name())
 	}
 }
 
+// ProblematicItem represents a media item with filesystem-incompatible characters in its name
 type ProblematicItem struct {
-	Name string `json:"name"`
-	SubtitleURL string `json:"subtitle_url"`
-	SafeName string `json:"safe_name"`
-	UnsafeName string `json:"unsafe_name"`
-	SafeSubtitleFilename string `json:"safe_subtitle_filename"`
+	Name                   string `json:"name"`
+	SubtitleURL            string `json:"subtitle_url"`
+	SafeName               string `json:"safe_name"`
+	UnsafeName             string `json:"unsafe_name"`
+	SafeSubtitleFilename   string `json:"safe_subtitle_filename"`
 	UnsafeSubtitleFilename string `json:"unsafe_subtitle_filename"`
-	ProblematicChars string `json:"problematic_chars"`
+	ProblematicChars       string `json:"problematic_chars"`
 }
 
+// FilenameCollision represents a filename that appears multiple times with collision statistics
 type FilenameCollision struct {
 	Filename string `json:"filename"`
-	Count int `json:"count"`
-	Mode string `json:"mode"`
+	Count    int    `json:"count"`
+	Mode     string `json:"mode"`
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
@@ -208,7 +221,7 @@ func formatFilename(s string, safe bool) string {
 	if !utf8.ValidString(s) {
 		return ""
 	}
-	
+
 	var forbidden string
 	if safe {
 		s = strings.ReplaceAll(s, `"`, "'")

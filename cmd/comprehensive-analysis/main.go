@@ -45,7 +45,7 @@ func main() {
 	for _, cat := range data {
 		var mediaCount int
 		var subtitleCount int
-		
+
 		for _, item := range cat.Contents {
 			if media, ok := item.(*api.Media); ok {
 				mediaCount++
@@ -55,7 +55,7 @@ func main() {
 				}
 			}
 		}
-		
+
 		categories = append(categories, CategoryData{
 			Key:           cat.Key,
 			Name:          cat.Name,
@@ -85,7 +85,7 @@ func main() {
 		{"StudioMonthlyPrograms", "StudioTalks", "StudioNewsReports", "StudioFeatured"},
 		// Convention categories
 		{"2025Convention", "2024Convention", "2023Convention", "2022Convention"},
-		// Children categories  
+		// Children categories
 		{"ChildrensSongs", "ChildrenSongs", "SeriesBJFSongs", "BJF"},
 		// Bible categories
 		{"BibleBooks", "SeriesBibleBooks", "VODBiblePrinciples"},
@@ -103,17 +103,17 @@ func main() {
 	for i, combo := range combinations {
 		var totalSubs int
 		var comboDetails []string
-		
+
 		for _, catKey := range combo {
 			if cat, exists := catMap[catKey]; exists {
 				totalSubs += cat.SubtitleCount
 				comboDetails = append(comboDetails, fmt.Sprintf("%s(%d)", catKey, cat.SubtitleCount))
 			}
 		}
-		
+
 		fmt.Printf("Combo %d: %d subtitles - %s\n", i+1, totalSubs, strings.Join(comboDetails, " + "))
-		if abs(totalSubs - 625) < 50 {
-			fmt.Printf("*** CLOSE MATCH! Difference: %d ***\n", abs(totalSubs - 625))
+		if abs(totalSubs-625) < 50 {
+			fmt.Printf("*** CLOSE MATCH! Difference: %d ***\n", abs(totalSubs-625))
 		}
 	}
 
@@ -161,8 +161,8 @@ func main() {
 			totalSubs += cat.SubtitleCount
 		}
 		fmt.Printf("%-15s: %3d categories, %4d subtitles\n", pattern, len(cats), totalSubs)
-		
-		if abs(totalSubs - 625) < 100 {
+
+		if abs(totalSubs-625) < 100 {
 			fmt.Printf("*** POTENTIAL MATCH! ***\n")
 			for _, cat := range cats {
 				if cat.SubtitleCount > 0 {
@@ -182,7 +182,7 @@ func main() {
 
 	// Try different approaches
 	approaches := []struct {
-		name string
+		name       string
 		categories []string
 	}{
 		{
@@ -202,16 +202,16 @@ func main() {
 	for _, approach := range approaches {
 		var total int
 		var details []string
-		
+
 		for _, catKey := range approach.categories {
 			if cat, exists := catMap[catKey]; exists {
 				total += cat.SubtitleCount
 				details = append(details, fmt.Sprintf("%s(%d)", catKey, cat.SubtitleCount))
 			}
 		}
-		
+
 		fmt.Printf("%-30s: %4d subtitles - %s\n", approach.name, total, strings.Join(details, " + "))
-		if abs(total - targetDiff) < 20 {
+		if abs(total-targetDiff) < 20 {
 			fmt.Printf("*** VERY CLOSE MATCH! ***\n")
 		}
 	}
@@ -219,15 +219,27 @@ func main() {
 	// Save detailed data for further analysis
 	saveData := map[string]interface{}{
 		"total_subtitles": totalWithSubtitles,
-		"categories": categories,
-		"patterns": patterns,
+		"categories":      categories,
+		"patterns":        patterns,
 	}
 
 	jsonData, _ := json.MarshalIndent(saveData, "", "  ")
-	err = os.WriteFile("/tmp/comprehensive_analysis.json", jsonData, 0644)
+	tmpFile, err := os.CreateTemp("", "comprehensive_analysis_*.json")
+	if err != nil {
+		fmt.Printf("Warning: could not create temp file: %v\n", err)
+		return
+	}
+	defer func() {
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
+		}
+	}()
+
+	err = os.WriteFile(tmpFile.Name(), jsonData, 0o600)
 	if err != nil {
 		fmt.Printf("Warning: could not save analysis data: %v\n", err)
 	} else {
+		fmt.Printf("\nAnalysis data saved to %s\n", tmpFile.Name())
 		fmt.Println("\nDetailed analysis saved to /tmp/comprehensive_analysis.json")
 	}
 }

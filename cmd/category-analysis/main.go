@@ -15,8 +15,8 @@ func main() {
 	fmt.Println("=" + strings.Repeat("=", 50))
 
 	settings := &config.Settings{
-		Lang:              "E", // Default language
-		IncludeCategories: []string{"VideoOnDemand"}, // Default category  
+		Lang:              "E",                        // Default language
+		IncludeCategories: []string{"VideoOnDemand"},  // Default category
 		ExcludeCategories: []string{"VODSJJMeetings"}, // Default exclude
 		Quiet:             1,
 	}
@@ -44,24 +44,24 @@ func main() {
 	for _, cat := range data {
 		var mediaCount int
 		var subtitleCount int
-		
+
 		for _, item := range cat.Contents {
 			if media, ok := item.(*api.Media); ok {
 				mediaCount++
 				totalMedia++
-				
+
 				if media.SubtitleURL != "" {
 					subtitleCount++
 					totalWithSubtitles++
 				}
 			}
 		}
-		
+
 		categoryStats[cat.Key] = CategoryInfo{
-			Name: cat.Name,
-			MediaCount: mediaCount,
+			Name:          cat.Name,
+			MediaCount:    mediaCount,
 			SubtitleCount: subtitleCount,
-			IsHome: cat.Home,
+			IsHome:        cat.Home,
 		}
 	}
 
@@ -74,15 +74,15 @@ func main() {
 
 	// Sort categories by subtitle count for better analysis
 	type CategoryResult struct {
-		Key string
+		Key  string
 		Info CategoryInfo
 	}
-	
+
 	var sortedCategories []CategoryResult
 	for key, info := range categoryStats {
 		sortedCategories = append(sortedCategories, CategoryResult{key, info})
 	}
-	
+
 	sort.Slice(sortedCategories, func(i, j int) bool {
 		return sortedCategories[i].Info.SubtitleCount > sortedCategories[j].Info.SubtitleCount
 	})
@@ -90,7 +90,7 @@ func main() {
 	fmt.Printf("Top 20 Categories by Subtitle Count:\n")
 	fmt.Printf("%-25s %-8s %-8s %-6s %s\n", "Key", "Media", "Subs", "Home", "Name")
 	fmt.Println(strings.Repeat("-", 80))
-	
+
 	for i, cat := range sortedCategories {
 		if i >= 20 {
 			break
@@ -99,9 +99,9 @@ func main() {
 		if cat.Info.IsHome {
 			homeFlag = "HOME"
 		}
-		fmt.Printf("%-25s %-8d %-8d %-6s %s\n", 
-			cat.Key, 
-			cat.Info.MediaCount, 
+		fmt.Printf("%-25s %-8d %-8d %-6s %s\n",
+			cat.Key,
+			cat.Info.MediaCount,
 			cat.Info.SubtitleCount,
 			homeFlag,
 			cat.Info.Name)
@@ -113,7 +113,7 @@ func main() {
 	for _, cat := range sortedCategories {
 		if cat.Info.SubtitleCount == 0 && cat.Info.MediaCount > 0 {
 			if zeroCount < 10 { // Show first 10
-				fmt.Printf("  %s: %d media items, 0 subtitles (%s)\n", 
+				fmt.Printf("  %s: %d media items, 0 subtitles (%s)\n",
 					cat.Key, cat.Info.MediaCount, cat.Info.Name)
 			}
 			zeroCount++
@@ -125,42 +125,43 @@ func main() {
 
 	// Check if we can identify potential data loss
 	fmt.Println("\nPotential Data Loss Analysis:")
-	
+
 	// Categories that might be excluded on Windows but not Linux
 	suspiciousCategories := []string{
 		"VODSJJMeetings", // This is in default exclude list
 		"StudioFeatured",
-		"StudioMonthlyPrograms", 
+		"StudioMonthlyPrograms",
 		"StudioTalks",
 		"StudioNewsReports",
 	}
-	
+
 	var suspiciousSubtitleCount int
 	for _, catKey := range suspiciousCategories {
 		if info, exists := categoryStats[catKey]; exists {
-			fmt.Printf("  %s: %d subtitles (might be excluded on some platforms)\n", 
+			fmt.Printf("  %s: %d subtitles (might be excluded on some platforms)\n",
 				catKey, info.SubtitleCount)
 			suspiciousSubtitleCount += info.SubtitleCount
 		}
 	}
-	
+
 	fmt.Printf("\nIf the %d subtitles from suspicious categories were excluded,\n", suspiciousSubtitleCount)
-	fmt.Printf("the count would be: %d (difference from %d: %d)\n", 
-		totalWithSubtitles - suspiciousSubtitleCount, totalWithSubtitles, suspiciousSubtitleCount)
-	
+	fmt.Printf("the count would be: %d (difference from %d: %d)\n",
+		totalWithSubtitles-suspiciousSubtitleCount, totalWithSubtitles, suspiciousSubtitleCount)
+
 	fmt.Printf("\nUser reported Windows: 2310, Linux: 2935\n")
 	fmt.Printf("Difference: %d subtitles missing on Windows\n", 2935-2310)
-	
-	if abs(suspiciousSubtitleCount - (2935-2310)) < 50 {
+
+	if abs(suspiciousSubtitleCount-(2935-2310)) < 50 {
 		fmt.Printf("*** LIKELY CAUSE: Category filtering differences! ***\n")
 	}
 }
 
+// CategoryInfo represents information about a category including media and subtitle counts
 type CategoryInfo struct {
-	Name string
-	MediaCount int
+	Name          string
+	MediaCount    int
 	SubtitleCount int
-	IsHome bool
+	IsHome        bool
 }
 
 func abs(x int) int {

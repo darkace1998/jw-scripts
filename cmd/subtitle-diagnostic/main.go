@@ -45,11 +45,11 @@ func main() {
 		for _, item := range cat.Contents {
 			if media, ok := item.(*api.Media); ok {
 				totalMedia++
-				
+
 				if media.SubtitleURL != "" {
 					mediaWithSubtitles++
 					subtitleURLs = append(subtitleURLs, media.SubtitleURL)
-					
+
 					// Check for potentially problematic URLs
 					if !utf8.ValidString(media.SubtitleURL) {
 						problematicURLs = append(problematicURLs, fmt.Sprintf("INVALID_UTF8: %s", media.SubtitleURL))
@@ -145,19 +145,30 @@ func main() {
 		"media_with_subtitles": mediaWithSubtitles,
 		"subtitle_urls":        subtitleURLs,
 		"problematic_urls":     problematicURLs,
-		"sample_empty_items":   emptySubtitleURLs[:min(len(emptySubtitleURLs), 50)],
+		"sample_empty_items":   emptySubtitleURLs[:minInt(len(emptySubtitleURLs), 50)],
 	}
 
 	jsonData, _ := json.MarshalIndent(saveData, "", "  ")
-	err = os.WriteFile("/tmp/subtitle_diagnostic.json", jsonData, 0644)
+	tmpFile, err := os.CreateTemp("", "subtitle_diagnostic_*.json")
+	if err != nil {
+		fmt.Printf("Warning: could not create temp file: %v\n", err)
+		return
+	}
+	defer func() {
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
+		}
+	}()
+
+	err = os.WriteFile(tmpFile.Name(), jsonData, 0o600)
 	if err != nil {
 		fmt.Printf("Warning: could not save diagnostic data: %v\n", err)
 	} else {
-		fmt.Println("Diagnostic data saved to /tmp/subtitle_diagnostic.json")
+		fmt.Printf("Diagnostic data saved to %s\n", tmpFile.Name())
 	}
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
