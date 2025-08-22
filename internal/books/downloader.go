@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/allejok96/jwb-go/internal/config"
 	"github.com/allejok96/jwb-go/internal/downloader"
@@ -46,6 +47,12 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	}
 
 	// Determine output file path
+	// Sanitize the filename to remove problematic characters
+	safeTitle := strings.ReplaceAll(book.Title, "—", "-")
+	safeTitle = strings.ReplaceAll(safeTitle, ":", "_")
+	safeTitle = strings.ReplaceAll(safeTitle, "/", "_")
+	safeTitle = strings.ReplaceAll(safeTitle, "\\", "_")
+	
 	outputPath := filepath.Join(outputDir, targetFile.Filename)
 	if outputPath == filepath.Join(outputDir, "") {
 		// Generate filename if not provided
@@ -55,7 +62,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 		} else if format == FormatPDF {
 			ext = "pdf"
 		}
-		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s.%s", book.Title, ext))
+		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s.%s", safeTitle, ext))
 	}
 
 	// Use the existing downloader infrastructure
@@ -63,7 +70,12 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 		fmt.Printf("Downloading: %s -> %s\n", book.Title, outputPath)
 	}
 
-	return downloader.DownloadFile(d.settings, targetFile.URL, outputPath, true, d.settings.RateLimit)
+	// Ensure the parent directory exists
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return fmt.Errorf("failed to create parent directory for %s: %v", outputPath, err)
+	}
+
+	return downloader.DownloadFile(d.settings, targetFile.URL, outputPath, false, d.settings.RateLimit)
 }
 
 // DownloadCategory downloads all books in a category

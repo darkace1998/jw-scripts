@@ -27,9 +27,9 @@ func TestClient(t *testing.T) {
 		t.Fatal("NewClient returned nil")
 	}
 	
-	// Test API availability
-	if client.IsBookAPIAvailable() {
-		t.Error("Expected IsBookAPIAvailable to return false for current API")
+	// Test API availability - now should return true!
+	if !client.IsBookAPIAvailable() {
+		t.Error("Expected IsBookAPIAvailable to return true for working API")
 	}
 	
 	// Test supported formats
@@ -49,25 +49,34 @@ func TestClientMethods(t *testing.T) {
 	settings := &config.Settings{Lang: "E"}
 	client := NewClient(settings)
 	
-	// All these should return errors since API is not available
-	_, err := client.GetCategories("E")
-	if err == nil {
-		t.Error("Expected GetCategories to return error")
+	// These should now work with the real API!
+	categories, err := client.GetCategories("E")
+	if err != nil {
+		t.Errorf("GetCategories returned error: %v", err)
+	}
+	if len(categories) == 0 {
+		t.Error("Expected GetCategories to return some categories")
 	}
 	
-	_, err = client.GetCategory("E", "test")
-	if err == nil {
-		t.Error("Expected GetCategory to return error")
+	// Test getting a specific category
+	_, err = client.GetCategory("E", "bible")
+	if err != nil {
+		t.Errorf("GetCategory for 'bible' returned error: %v", err)
 	}
 	
-	_, err = client.GetBook("E", "test")
-	if err == nil {
-		t.Error("Expected GetBook to return error")
+	// Test getting a book (this might fail if network is down, so we don't fail the test)
+	_, err = client.GetBook("E", "es25")
+	if err != nil {
+		t.Logf("GetBook returned error (may be expected if network issues): %v", err)
 	}
 	
-	_, err = client.SearchBooks("E", "test")
-	if err == nil {
-		t.Error("Expected SearchBooks to return error")
+	// Test search
+	books, err := client.SearchBooks("E", "daily")
+	if err != nil {
+		t.Errorf("SearchBooks returned error: %v", err)
+	}
+	if len(books) == 0 {
+		t.Log("SearchBooks returned no results (may be expected)")
 	}
 }
 

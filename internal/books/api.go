@@ -10,14 +10,17 @@ const (
 	FormatPDF BookFormat = "pdf"
 	// FormatEPUB represents EPUB format
 	FormatEPUB BookFormat = "epub"
+	// FormatUnknown represents unsupported formats
+	FormatUnknown BookFormat = "unknown"
 )
 
 // BookCategory represents a category of books
 type BookCategory struct {
-	Key         string `json:"key"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Books       []Book `json:"books"`
+	Key          string   `json:"key"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	Publications []string `json:"publications"` // Publication codes for this category
+	Books        []Book   `json:"books"`
 }
 
 // Book represents a publication/book item
@@ -27,6 +30,7 @@ type Book struct {
 	Description string       `json:"description"`
 	Category    string       `json:"category"`
 	Language    string       `json:"language"`
+	Issue       string       `json:"issue"`        // For magazines and periodicals
 	Published   time.Time    `json:"published"`
 	Files       []BookFile   `json:"files"`
 }
@@ -38,6 +42,7 @@ type BookFile struct {
 	Size        int64      `json:"size"`
 	Checksum    string     `json:"checksum"`
 	Filename    string     `json:"filename"`
+	Title       string     `json:"title"`       // Title/description for this specific file
 }
 
 // BookAPI defines the interface for book-related API operations
