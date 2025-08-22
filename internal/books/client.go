@@ -50,6 +50,40 @@ func NewClient(s *config.Settings) *Client {
 	}
 }
 
+// GetSupportedLanguages returns all supported languages
+func (c *Client) GetSupportedLanguages() ([]Language, error) {
+	// Based on API discovery, these are the confirmed supported languages
+	languages := []Language{
+		{Code: "E", Name: "English", Direction: "ltr", Locale: "en"},
+		{Code: "S", Name: "español", Direction: "ltr", Locale: "es"},
+		{Code: "F", Name: "Français", Direction: "ltr", Locale: "fr"},
+		{Code: "T", Name: "Português (Brasil)", Direction: "ltr", Locale: "pt-BR"},
+		{Code: "X", Name: "Deutsch", Direction: "ltr", Locale: "de"},
+		{Code: "P", Name: "polski", Direction: "ltr", Locale: "pl"},
+		{Code: "Z", Name: "Svenska", Direction: "ltr", Locale: "sv"},
+		{Code: "J", Name: "日本語", Direction: "ltr", Locale: "ja"},
+		{Code: "K", Name: "українська", Direction: "ltr", Locale: "uk"},
+		{Code: "I", Name: "Italiano", Direction: "ltr", Locale: "it"},
+		{Code: "U", Name: "русский", Direction: "ltr", Locale: "ru"},
+		{Code: "R", Name: "Արեւմտահայերէն", Direction: "ltr", Locale: "hy"},
+		{Code: "Q", Name: "עברית", Direction: "rtl", Locale: "he"},
+		{Code: "V", Name: "slovenčina", Direction: "ltr", Locale: "sk"},
+		{Code: "W", Name: "Cymraeg", Direction: "ltr", Locale: "cy"},
+		{Code: "H", Name: "magyar", Direction: "ltr", Locale: "hu"},
+		{Code: "N", Name: "Norsk", Direction: "ltr", Locale: "no"},
+		{Code: "A", Name: "العربية", Direction: "rtl", Locale: "ar"},
+		{Code: "B", Name: "čeština", Direction: "ltr", Locale: "cs"},
+		{Code: "C", Name: "hrvatski", Direction: "ltr", Locale: "hr"},
+		{Code: "D", Name: "Dansk", Direction: "ltr", Locale: "da"},
+		{Code: "G", Name: "Ελληνική", Direction: "ltr", Locale: "el"},
+		{Code: "L", Name: "lietuvių", Direction: "ltr", Locale: "lt"},
+		{Code: "M", Name: "Română", Direction: "ltr", Locale: "ro"},
+		{Code: "O", Name: "Nederlands", Direction: "ltr", Locale: "nl"},
+	}
+	
+	return languages, nil
+}
+
 // GetCategories returns all available book categories
 func (c *Client) GetCategories(lang string) ([]BookCategory, error) {
 	// Pre-defined categories based on known publication types
@@ -125,7 +159,7 @@ func (c *Client) GetCategory(lang, categoryKey string) (*BookCategory, error) {
 // GetBook returns details for a specific book
 func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 	// Make request to the publication API
-	pubResp, err := c.getPublicationData(bookID, "")
+	pubResp, err := c.getPublicationDataForLanguage(bookID, "", lang)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get publication data for '%s': %w", bookID, err)
 	}
@@ -195,7 +229,7 @@ func (c *Client) SearchBooks(lang, query string) ([]Book, error) {
 
 // GetSupportedFormats returns the book formats that are supported
 func (c *Client) GetSupportedFormats() []BookFormat {
-	return []BookFormat{FormatPDF, FormatEPUB}
+	return []BookFormat{FormatPDF, FormatEPUB, FormatMP3, FormatMP4, FormatRTF, FormatBRL}
 }
 
 // IsBookAPIAvailable checks if the book API is currently available
@@ -210,12 +244,19 @@ func (c *Client) GetAPILimitations() string {
 ✅ Publication downloads are now available through the JW.org Publication Media API!
 
 Available Features:
-- PDF and EPUB format downloads
+- Multiple formats: PDF, EPUB, MP3, MP4, RTF, BRL
+- 25+ languages including major world languages
 - Bible (New World Translation Study Edition)
 - Daily text publications
 - Yearbooks and indexes
 - Circuit assembly and convention materials
 - Magazine downloads (with issue specification)
+
+Supported Languages:
+- English, Spanish, French, Portuguese, German, Polish, Swedish
+- Japanese, Ukrainian, Italian, Russian, Armenian, Hebrew
+- Slovak, Welsh, Hungarian, Norwegian, Arabic, Czech
+- Croatian, Danish, Greek, Lithuanian, Romanian, Dutch
 
 API Endpoint: https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS
 
@@ -224,13 +265,18 @@ The framework fully supports book downloads with real data from JW.org.`
 
 // getPublicationData fetches publication data from the JW.org API
 func (c *Client) getPublicationData(pubCode, issue string) (*PublicationResponse, error) {
+	return c.getPublicationDataForLanguage(pubCode, issue, "E")
+}
+
+// getPublicationDataForLanguage fetches publication data for a specific language
+func (c *Client) getPublicationDataForLanguage(pubCode, issue, lang string) (*PublicationResponse, error) {
 	params := url.Values{}
 	params.Set("output", "json")
 	params.Set("pub", pubCode)
-	params.Set("fileformat", "PDF,EPUB")
+	params.Set("fileformat", "PDF,EPUB,MP3,MP4,RTF,BRL")
 	params.Set("alllangs", "0")
-	params.Set("langwritten", "E")
-	params.Set("txtCMSLang", "E")
+	params.Set("langwritten", lang)
+	params.Set("txtCMSLang", lang)
 	
 	if issue != "" {
 		params.Set("issue", issue)
@@ -268,6 +314,14 @@ func (c *Client) parseFormat(formatString string) BookFormat {
 		return FormatPDF
 	case "EPUB":
 		return FormatEPUB
+	case "MP3":
+		return FormatMP3
+	case "MP4":
+		return FormatMP4
+	case "RTF":
+		return FormatRTF
+	case "BRL":
+		return FormatBRL
 	default:
 		return FormatUnknown
 	}

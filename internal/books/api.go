@@ -10,9 +10,25 @@ const (
 	FormatPDF BookFormat = "pdf"
 	// FormatEPUB represents EPUB format
 	FormatEPUB BookFormat = "epub"
+	// FormatMP3 represents MP3 audio format
+	FormatMP3 BookFormat = "mp3"
+	// FormatMP4 represents MP4 video format
+	FormatMP4 BookFormat = "mp4"
+	// FormatRTF represents RTF text format
+	FormatRTF BookFormat = "rtf"
+	// FormatBRL represents Braille format
+	FormatBRL BookFormat = "brl"
 	// FormatUnknown represents unsupported formats
 	FormatUnknown BookFormat = "unknown"
 )
+
+// Language represents a supported language
+type Language struct {
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	Direction string `json:"direction"`
+	Locale    string `json:"locale"`
+}
 
 // BookCategory represents a category of books
 type BookCategory struct {
@@ -47,6 +63,9 @@ type BookFile struct {
 
 // BookAPI defines the interface for book-related API operations
 type BookAPI interface {
+	// GetSupportedLanguages returns all supported languages
+	GetSupportedLanguages() ([]Language, error)
+	
 	// GetCategories returns all available book categories
 	GetCategories(lang string) ([]BookCategory, error)
 	
@@ -58,6 +77,9 @@ type BookAPI interface {
 	
 	// SearchBooks searches for books by title or content
 	SearchBooks(lang, query string) ([]Book, error)
+	
+	// GetSupportedFormats returns all supported book formats
+	GetSupportedFormats() []BookFormat
 }
 
 // BookDownloader defines the interface for downloading books

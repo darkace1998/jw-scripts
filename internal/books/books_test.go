@@ -14,6 +14,18 @@ func TestBookFormats(t *testing.T) {
 	if FormatEPUB != "epub" {
 		t.Errorf("Expected FormatEPUB to be 'epub', got '%s'", FormatEPUB)
 	}
+	if FormatMP3 != "mp3" {
+		t.Errorf("Expected FormatMP3 to be 'mp3', got '%s'", FormatMP3)
+	}
+	if FormatMP4 != "mp4" {
+		t.Errorf("Expected FormatMP4 to be 'mp4', got '%s'", FormatMP4)
+	}
+	if FormatRTF != "rtf" {
+		t.Errorf("Expected FormatRTF to be 'rtf', got '%s'", FormatRTF)
+	}
+	if FormatBRL != "brl" {
+		t.Errorf("Expected FormatBRL to be 'brl', got '%s'", FormatBRL)
+	}
 }
 
 func TestClient(t *testing.T) {
@@ -34,8 +46,8 @@ func TestClient(t *testing.T) {
 	
 	// Test supported formats
 	formats := client.GetSupportedFormats()
-	if len(formats) != 2 {
-		t.Errorf("Expected 2 supported formats, got %d", len(formats))
+	if len(formats) != 6 {
+		t.Errorf("Expected 6 supported formats, got %d", len(formats))
 	}
 	
 	// Test limitations message
@@ -48,6 +60,27 @@ func TestClient(t *testing.T) {
 func TestClientMethods(t *testing.T) {
 	settings := &config.Settings{Lang: "E"}
 	client := NewClient(settings)
+	
+	// Test supported languages
+	languages, err := client.GetSupportedLanguages()
+	if err != nil {
+		t.Errorf("GetSupportedLanguages returned error: %v", err)
+	}
+	if len(languages) < 20 {
+		t.Errorf("Expected at least 20 supported languages, got %d", len(languages))
+	}
+	
+	// Check that English is in the list
+	foundEnglish := false
+	for _, lang := range languages {
+		if lang.Code == "E" && lang.Name == "English" {
+			foundEnglish = true
+			break
+		}
+	}
+	if !foundEnglish {
+		t.Error("English language not found in supported languages")
+	}
 	
 	// These should now work with the real API!
 	categories, err := client.GetCategories("E")
@@ -118,6 +151,23 @@ func TestDownloadBook(t *testing.T) {
 	err = downloader.DownloadBook(book, FormatPDF, "/tmp")
 	if err == nil {
 		t.Error("Expected DownloadBook to return error when format not available")
+	}
+	
+	// Test file extension function
+	extensions := map[BookFormat]string{
+		FormatPDF:  "pdf",
+		FormatEPUB: "epub",
+		FormatMP3:  "mp3",
+		FormatMP4:  "mp4",
+		FormatRTF:  "rtf",
+		FormatBRL:  "brl",
+	}
+	
+	for format, expectedExt := range extensions {
+		ext := downloader.getFileExtension(format)
+		if ext != expectedExt {
+			t.Errorf("Expected extension '%s' for format '%s', got '%s'", expectedExt, format, ext)
+		}
 	}
 }
 

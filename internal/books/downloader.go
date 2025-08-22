@@ -56,12 +56,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	outputPath := filepath.Join(outputDir, targetFile.Filename)
 	if outputPath == filepath.Join(outputDir, "") {
 		// Generate filename if not provided
-		ext := string(format)
-		if format == FormatEPUB {
-			ext = "epub"
-		} else if format == FormatPDF {
-			ext = "pdf"
-		}
+		ext := d.getFileExtension(format)
 		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s.%s", safeTitle, ext))
 	}
 
@@ -140,6 +135,26 @@ func (d *Downloader) ValidateChecksum(filePath, expectedChecksum string) error {
 	// This would implement MD5 checksum validation
 	// For now, just return success since it's a framework
 	return nil
+}
+
+// getFileExtension returns the appropriate file extension for a format
+func (d *Downloader) getFileExtension(format BookFormat) string {
+	switch format {
+	case FormatPDF:
+		return "pdf"
+	case FormatEPUB:
+		return "epub"
+	case FormatMP3:
+		return "mp3"
+	case FormatMP4:
+		return "mp4"
+	case FormatRTF:
+		return "rtf"
+	case FormatBRL:
+		return "brl"
+	default:
+		return string(format)
+	}
 }
 
 // GetDownloadProgress returns download progress information
