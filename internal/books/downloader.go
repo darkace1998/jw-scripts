@@ -1,10 +1,14 @@
 package books
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/allejok96/jwb-go/internal/config"
 	"github.com/allejok96/jwb-go/internal/downloader"
@@ -12,13 +16,18 @@ import (
 
 // Downloader implements the BookDownloader interface
 type Downloader struct {
-	settings *config.Settings
+	settings        *config.Settings
+	progressMutex   sync.Mutex
+	downloadedBytes int64
+	totalBytes      int64
 }
 
 // NewDownloader creates a new book downloader
 func NewDownloader(s *config.Settings) *Downloader {
 	return &Downloader{
-		settings: s,
+		settings:        s,
+		downloadedBytes: 0,
+		totalBytes:      0,
 	}
 }
 
@@ -132,8 +141,15 @@ func (d *Downloader) ValidateChecksum(filePath, expectedChecksum string) error {
 	}
 	defer file.Close()
 
-	// This would implement MD5 checksum validation
-	// For now, just return success since it's a framework
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return fmt.Errorf("failed to compute checksum: %v", err)
+	}
+	actualChecksum := hex.EncodeToString(hash.Sum(nil))
+	// Compare checksums case-insensitively
+	if strings.ToLower(actualChecksum) != strings.ToLower(expectedChecksum) {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
+	}
 	return nil
 }
 
@@ -159,7 +175,23 @@ func (d *Downloader) getFileExtension(format BookFormat) string {
 
 // GetDownloadProgress returns download progress information
 func (d *Downloader) GetDownloadProgress() (downloaded int64, total int64) {
-	// This would be implemented to track download progress
-	// For now, return 0 values as this is a framework
-	return 0, 0
+	d.progressMutex.Lock()
+	defer d.progressMutex.Unlock()
+	return d.downloadedBytes, d.totalBytes
+}
+
+// SetDownloadProgress updates the download progress information
+func (d *Downloader) SetDownloadProgress(downloaded, total int64) {
+	d.progressMutex.Lock()
+	defer d.progressMutex.Unlock()
+	d.downloadedBytes = downloaded
+	d.totalBytes = total
+}
+
+// ResetDownloadProgress resets the download progress to zero
+func (d *Downloader) ResetDownloadProgress() {
+	d.progressMutex.Lock()
+	defer d.progressMutex.Unlock()
+	d.downloadedBytes = 0
+	d.totalBytes = 0
 }

@@ -1,6 +1,7 @@
 package books
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -128,6 +129,20 @@ func TestDownloader(t *testing.T) {
 	if downloaded != 0 || total != 0 {
 		t.Errorf("Expected progress to be 0,0 but got %d,%d", downloaded, total)
 	}
+	
+	// Test progress tracking
+	downloader.SetDownloadProgress(500, 1000)
+	downloaded, total = downloader.GetDownloadProgress()
+	if downloaded != 500 || total != 1000 {
+		t.Errorf("Expected progress to be 500,1000 but got %d,%d", downloaded, total)
+	}
+	
+	// Test progress reset
+	downloader.ResetDownloadProgress()
+	downloaded, total = downloader.GetDownloadProgress()
+	if downloaded != 0 || total != 0 {
+		t.Errorf("Expected progress to be 0,0 after reset but got %d,%d", downloaded, total)
+	}
 }
 
 func TestDownloadBook(t *testing.T) {
@@ -244,5 +259,45 @@ func TestBookCategory(t *testing.T) {
 	
 	if category.Key != "bible-study" {
 		t.Errorf("Expected category key 'bible-study', got '%s'", category.Key)
+	}
+}
+
+func TestChecksumValidation(t *testing.T) {
+	settings := &config.Settings{Quiet: 2}
+	downloader := NewDownloader(settings)
+	
+	// Create a temporary file for testing
+	tmpFile := "/tmp/test_checksum_file.txt"
+	content := "Hello, World!"
+	err := os.WriteFile(tmpFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	defer os.Remove(tmpFile)
+	
+	// Test with empty checksum (should pass)
+	err = downloader.ValidateChecksum(tmpFile, "")
+	if err != nil {
+		t.Errorf("ValidateChecksum with empty checksum should pass, got error: %v", err)
+	}
+	
+	// Test with correct MD5 checksum (MD5 of "Hello, World!" is 65a8e27d8879283831b664bd8b7f0ad4)
+	correctChecksum := "65a8e27d8879283831b664bd8b7f0ad4"
+	err = downloader.ValidateChecksum(tmpFile, correctChecksum)
+	if err != nil {
+		t.Errorf("ValidateChecksum with correct checksum failed: %v", err)
+	}
+	
+	// Test with incorrect checksum
+	incorrectChecksum := "wrongchecksum"
+	err = downloader.ValidateChecksum(tmpFile, incorrectChecksum)
+	if err == nil {
+		t.Error("ValidateChecksum with incorrect checksum should fail")
+	}
+	
+	// Test with non-existent file
+	err = downloader.ValidateChecksum("/tmp/nonexistent.txt", correctChecksum)
+	if err == nil {
+		t.Error("ValidateChecksum with non-existent file should fail")
 	}
 }

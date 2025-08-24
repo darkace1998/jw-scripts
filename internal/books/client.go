@@ -234,7 +234,21 @@ func (c *Client) GetSupportedFormats() []BookFormat {
 
 // IsBookAPIAvailable checks if the book API is currently available
 func (c *Client) IsBookAPIAvailable() bool {
-	return true // The publication API is now available!
+	// Test with a simple request to see if the API endpoint is reachable
+	// We'll use the base domain rather than the full API URL for the health check
+	baseURL := "https://b.jw-cdn.org"
+	req, err := http.NewRequest("GET", baseURL, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	// The CDN should respond even with a simple GET to the root
+	// Consider 2xx, 3xx, and 4xx status codes as available (CDN is responding)
+	return resp.StatusCode >= 200 && resp.StatusCode < 500
 }
 
 // GetAPILimitations returns information about current API status
