@@ -51,7 +51,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	}
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
@@ -61,7 +61,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	safeTitle = strings.ReplaceAll(safeTitle, ":", "_")
 	safeTitle = strings.ReplaceAll(safeTitle, "/", "_")
 	safeTitle = strings.ReplaceAll(safeTitle, "\\", "_")
-	
+
 	outputPath := filepath.Join(outputDir, targetFile.Filename)
 	if outputPath == filepath.Join(outputDir, "") {
 		// Generate filename if not provided
@@ -75,7 +75,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	}
 
 	// Ensure the parent directory exists
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
 		return fmt.Errorf("failed to create parent directory for %s: %v", outputPath, err)
 	}
 
@@ -97,7 +97,7 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 
 	// Create category subdirectory
 	categoryDir := filepath.Join(outputDir, category.Key)
-	if err := os.MkdirAll(categoryDir, 0755); err != nil {
+	if err := os.MkdirAll(categoryDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create category directory: %v", err)
 	}
 
@@ -106,7 +106,7 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 
 	for i := range category.Books {
 		book := &category.Books[i]
-		
+
 		if d.settings.Quiet < 2 {
 			fmt.Printf("[%d/%d] ", i+1, len(category.Books))
 		}
@@ -122,7 +122,7 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 	}
 
 	if d.settings.Quiet < 1 {
-		fmt.Printf("Category '%s' download complete: %d successful, %d failed\n", 
+		fmt.Printf("Category '%s' download complete: %d successful, %d failed\n",
 			category.Name, successCount, errorCount)
 	}
 
@@ -139,7 +139,7 @@ func (d *Downloader) ValidateChecksum(filePath, expectedChecksum string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file for checksum validation: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hash := md5.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -147,7 +147,7 @@ func (d *Downloader) ValidateChecksum(filePath, expectedChecksum string) error {
 	}
 	actualChecksum := hex.EncodeToString(hash.Sum(nil))
 	// Compare checksums case-insensitively
-	if strings.ToLower(actualChecksum) != strings.ToLower(expectedChecksum) {
+	if !strings.EqualFold(actualChecksum, expectedChecksum) {
 		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
 	}
 	return nil
@@ -174,7 +174,7 @@ func (d *Downloader) getFileExtension(format BookFormat) string {
 }
 
 // GetDownloadProgress returns download progress information
-func (d *Downloader) GetDownloadProgress() (downloaded int64, total int64) {
+func (d *Downloader) GetDownloadProgress() (downloaded, total int64) {
 	d.progressMutex.Lock()
 	defer d.progressMutex.Unlock()
 	return d.downloadedBytes, d.totalBytes

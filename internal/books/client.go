@@ -20,19 +20,19 @@ type Client struct {
 
 // PublicationResponse represents the API response from the JW.org publication media API
 type PublicationResponse struct {
-	PubName       string                             `json:"pubName"`
-	ParentPubName string                             `json:"parentPubName"`
-	Pub           string                             `json:"pub"`
-	Issue         string                             `json:"issue"`
-	FormattedDate string                             `json:"formattedDate"`
-	FileFormat    []string                           `json:"fileformat"`
-	Files         map[string]map[string][]FileInfo   `json:"files"`
+	PubName       string                           `json:"pubName"`
+	ParentPubName string                           `json:"parentPubName"`
+	Pub           string                           `json:"pub"`
+	Issue         string                           `json:"issue"`
+	FormattedDate string                           `json:"formattedDate"`
+	FileFormat    []string                         `json:"fileformat"`
+	Files         map[string]map[string][]FileInfo `json:"files"`
 }
 
 // FileInfo represents a downloadable file from the API
 type FileInfo struct {
-	Title    string `json:"title"`
-	File     struct {
+	Title string `json:"title"`
+	File  struct {
 		URL              string `json:"url"`
 		ModifiedDatetime string `json:"modifiedDatetime"`
 		Checksum         string `json:"checksum"`
@@ -80,7 +80,7 @@ func (c *Client) GetSupportedLanguages() ([]Language, error) {
 		{Code: "M", Name: "Română", Direction: "ltr", Locale: "ro"},
 		{Code: "O", Name: "Nederlands", Direction: "ltr", Locale: "nl"},
 	}
-	
+
 	return languages, nil
 }
 
@@ -89,43 +89,43 @@ func (c *Client) GetCategories(lang string) ([]BookCategory, error) {
 	// Pre-defined categories based on known publication types
 	categories := []BookCategory{
 		{
-			Key:         "bible",
-			Name:        "Bible",
-			Description: "New World Translation of the Holy Scriptures",
+			Key:          "bible",
+			Name:         "Bible",
+			Description:  "New World Translation of the Holy Scriptures",
 			Publications: []string{"nwtsty"},
 		},
 		{
-			Key:         "daily-text",
-			Name:        "Daily Text",
-			Description: "Examining the Scriptures Daily",
+			Key:          "daily-text",
+			Name:         "Daily Text",
+			Description:  "Examining the Scriptures Daily",
 			Publications: []string{"es25"},
 		},
 		{
-			Key:         "yearbooks",
-			Name:        "Yearbooks",
-			Description: "Watch Tower Publications Index and Yearbooks",
+			Key:          "yearbooks",
+			Name:         "Yearbooks",
+			Description:  "Watch Tower Publications Index and Yearbooks",
 			Publications: []string{"dx24"},
 		},
 		{
-			Key:         "circuit-assembly",
-			Name:        "Circuit Assembly Programs",
-			Description: "Circuit Assembly Programs",
+			Key:          "circuit-assembly",
+			Name:         "Circuit Assembly Programs",
+			Description:  "Circuit Assembly Programs",
 			Publications: []string{"ca-brpgm26"},
 		},
 		{
-			Key:         "convention",
-			Name:        "Convention Materials",
-			Description: "Convention invitations and programs",
+			Key:          "convention",
+			Name:         "Convention Materials",
+			Description:  "Convention invitations and programs",
 			Publications: []string{"co-inv25"},
 		},
 		{
-			Key:         "magazines",
-			Name:        "Magazines",
-			Description: "Watchtower and Awake! magazines (requires issue specification)",
+			Key:          "magazines",
+			Name:         "Magazines",
+			Description:  "Watchtower and Awake! magazines (requires issue specification)",
 			Publications: []string{"w", "g"},
 		},
 	}
-	
+
 	return categories, nil
 }
 
@@ -135,7 +135,7 @@ func (c *Client) GetCategory(lang, categoryKey string) (*BookCategory, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, category := range categories {
 		if category.Key == categoryKey {
 			// Populate books for this category
@@ -152,7 +152,7 @@ func (c *Client) GetCategory(lang, categoryKey string) (*BookCategory, error) {
 			return &category, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("category '%s' not found", categoryKey)
 }
 
@@ -163,7 +163,7 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get publication data for '%s': %w", bookID, err)
 	}
-	
+
 	// Convert to our Book format
 	book := &Book{
 		ID:          pubResp.Pub,
@@ -173,7 +173,7 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 		Issue:       pubResp.Issue,
 		Files:       make([]BookFile, 0),
 	}
-	
+
 	// Convert files
 	if langFiles, exists := pubResp.Files[strings.ToUpper(lang)]; exists {
 		for formatName, fileList := range langFiles {
@@ -181,7 +181,7 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 			if format == FormatUnknown {
 				continue // Skip unsupported formats
 			}
-			
+
 			for _, fileInfo := range fileList {
 				bookFile := BookFile{
 					Format:   format,
@@ -194,7 +194,7 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 			}
 		}
 	}
-	
+
 	return book, nil
 }
 
@@ -205,25 +205,25 @@ func (c *Client) SearchBooks(lang, query string) ([]Book, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var results []Book
 	queryLower := strings.ToLower(query)
-	
+
 	for _, category := range categories {
 		for _, pubCode := range category.Publications {
 			book, err := c.GetBook(lang, pubCode)
 			if err != nil {
 				continue
 			}
-			
+
 			// Simple text matching
 			if strings.Contains(strings.ToLower(book.Title), queryLower) ||
-			   strings.Contains(strings.ToLower(book.Description), queryLower) {
+				strings.Contains(strings.ToLower(book.Description), queryLower) {
 				results = append(results, *book)
 			}
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -237,7 +237,7 @@ func (c *Client) IsBookAPIAvailable() bool {
 	// Test with a simple request to see if the API endpoint is reachable
 	// We'll use the base domain rather than the full API URL for the health check
 	baseURL := "https://b.jw-cdn.org"
-	req, err := http.NewRequest("GET", baseURL, nil)
+	req, err := http.NewRequest("GET", baseURL, http.NoBody)
 	if err != nil {
 		return false
 	}
@@ -245,7 +245,7 @@ func (c *Client) IsBookAPIAvailable() bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	// The CDN should respond even with a simple GET to the root
 	// Consider 2xx, 3xx, and 4xx status codes as available (CDN is responding)
 	return resp.StatusCode >= 200 && resp.StatusCode < 500
@@ -277,11 +277,6 @@ API Endpoint: https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS
 The framework fully supports book downloads with real data from JW.org.`
 }
 
-// getPublicationData fetches publication data from the JW.org API
-func (c *Client) getPublicationData(pubCode, issue string) (*PublicationResponse, error) {
-	return c.getPublicationDataForLanguage(pubCode, issue, "E")
-}
-
 // getPublicationDataForLanguage fetches publication data for a specific language
 func (c *Client) getPublicationDataForLanguage(pubCode, issue, lang string) (*PublicationResponse, error) {
 	params := url.Values{}
@@ -291,33 +286,33 @@ func (c *Client) getPublicationDataForLanguage(pubCode, issue, lang string) (*Pu
 	params.Set("alllangs", "0")
 	params.Set("langwritten", lang)
 	params.Set("txtCMSLang", lang)
-	
+
 	if issue != "" {
 		params.Set("issue", issue)
 	}
-	
+
 	requestURL := c.baseURL + "?" + params.Encode()
-	
+
 	resp, err := c.httpClient.Get(requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
-	
+	defer func() { _ = resp.Body.Close() }()
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("API returned status %d for publication '%s'", resp.StatusCode, pubCode)
 	}
-	
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-	
+
 	var pubResp PublicationResponse
 	if err := json.Unmarshal(body, &pubResp); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
-	
+
 	return &pubResp, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/allejok96/jwb-go/internal/api"
@@ -31,7 +32,7 @@ func main() {
 
 	for _, catKey := range categoriesToCheck {
 		fmt.Printf("\n=== Analyzing Category: %s ===\n", catKey)
-		
+
 		catResp, err := client.GetCategory("E", catKey)
 		if err != nil {
 			fmt.Printf("Error getting category %s: %v\n", catKey, err)
@@ -45,11 +46,11 @@ func main() {
 		// Analyze media types and file extensions
 		mediaTypes := make(map[string]int)
 		fileExtensions := make(map[string]int)
-		
+
 		for i, media := range catResp.Category.Media {
 			if i < 10 { // Only show first 10 for brevity
 				fmt.Printf("  Media %d: %s (Type: %s)\n", i+1, media.Title, media.Type)
-				
+
 				for j, file := range media.Files {
 					if j < 2 { // Only show first 2 files per media
 						url := file.ProgressiveDownloadURL
@@ -59,7 +60,7 @@ func main() {
 					}
 				}
 			}
-			
+
 			mediaTypes[media.Type]++
 		}
 
@@ -86,17 +87,24 @@ func main() {
 
 	// Also check if there are any hidden/special categories we missed
 	fmt.Printf("\n=== Checking All Root Categories for Publication Clues ===\n")
-	
+
 	baseURL := "https://data.jw-api.org/mediator/v1"
 	resp, err := http.Get(fmt.Sprintf("%s/categories/E/?detailed=1", baseURL))
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close response body: %v\n", closeErr)
+		}
+	}()
 
 	var rootResp api.RootCategoriesResponse
-	json.NewDecoder(resp.Body).Decode(&rootResp)
+	if err := json.NewDecoder(resp.Body).Decode(&rootResp); err != nil {
+		fmt.Printf("Error decoding response: %v\n", err)
+		return
+	}
 
 	fmt.Printf("All categories (including excluded ones):\n")
 	for _, cat := range rootResp.Categories {
@@ -104,14 +112,14 @@ func main() {
 		keywords := []string{"publication", "book", "library", "watchtower", "awake", "study", "literature"}
 		hasKeyword := false
 		catLower := strings.ToLower(cat.Key + " " + cat.Name + " " + cat.Description)
-		
+
 		for _, keyword := range keywords {
 			if strings.Contains(catLower, keyword) {
 				hasKeyword = true
 				break
 			}
 		}
-		
+
 		if hasKeyword {
 			fmt.Printf("  POTENTIAL: %s (%s) - %s\n", cat.Key, cat.Name, cat.Description)
 			fmt.Printf("    Tags: %s\n", strings.Join(cat.Tags, ", "))
@@ -125,16 +133,16 @@ func getExtensionFromURL(url string) string {
 	if url == "" {
 		return ""
 	}
-	
+
 	// Remove query parameters
 	if idx := strings.Index(url, "?"); idx != -1 {
 		url = url[:idx]
 	}
-	
+
 	// Get the last part after the last dot
 	if idx := strings.LastIndex(url, "."); idx != -1 {
 		return url[idx:]
 	}
-	
+
 	return ""
 }

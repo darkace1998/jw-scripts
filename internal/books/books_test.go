@@ -33,24 +33,24 @@ func TestClient(t *testing.T) {
 	settings := &config.Settings{
 		Lang: "E",
 	}
-	
+
 	client := NewClient(settings)
-	
+
 	if client == nil {
 		t.Fatal("NewClient returned nil")
 	}
-	
+
 	// Test API availability - now should return true!
 	if !client.IsBookAPIAvailable() {
 		t.Error("Expected IsBookAPIAvailable to return true for working API")
 	}
-	
+
 	// Test supported formats
 	formats := client.GetSupportedFormats()
 	if len(formats) != 6 {
 		t.Errorf("Expected 6 supported formats, got %d", len(formats))
 	}
-	
+
 	// Test limitations message
 	limitations := client.GetAPILimitations()
 	if limitations == "" {
@@ -61,7 +61,7 @@ func TestClient(t *testing.T) {
 func TestClientMethods(t *testing.T) {
 	settings := &config.Settings{Lang: "E"}
 	client := NewClient(settings)
-	
+
 	// Test supported languages
 	languages, err := client.GetSupportedLanguages()
 	if err != nil {
@@ -70,7 +70,7 @@ func TestClientMethods(t *testing.T) {
 	if len(languages) < 20 {
 		t.Errorf("Expected at least 20 supported languages, got %d", len(languages))
 	}
-	
+
 	// Check that English is in the list
 	foundEnglish := false
 	for _, lang := range languages {
@@ -82,7 +82,7 @@ func TestClientMethods(t *testing.T) {
 	if !foundEnglish {
 		t.Error("English language not found in supported languages")
 	}
-	
+
 	// These should now work with the real API!
 	categories, err := client.GetCategories("E")
 	if err != nil {
@@ -91,19 +91,19 @@ func TestClientMethods(t *testing.T) {
 	if len(categories) == 0 {
 		t.Error("Expected GetCategories to return some categories")
 	}
-	
+
 	// Test getting a specific category
 	_, err = client.GetCategory("E", "bible")
 	if err != nil {
 		t.Errorf("GetCategory for 'bible' returned error: %v", err)
 	}
-	
+
 	// Test getting a book (this might fail if network is down, so we don't fail the test)
 	_, err = client.GetBook("E", "es25")
 	if err != nil {
 		t.Logf("GetBook returned error (may be expected if network issues): %v", err)
 	}
-	
+
 	// Test search
 	books, err := client.SearchBooks("E", "daily")
 	if err != nil {
@@ -118,25 +118,25 @@ func TestDownloader(t *testing.T) {
 	settings := &config.Settings{
 		Quiet: 2, // Suppress output during tests
 	}
-	
+
 	downloader := NewDownloader(settings)
 	if downloader == nil {
 		t.Fatal("NewDownloader returned nil")
 	}
-	
+
 	// Test download progress
 	downloaded, total := downloader.GetDownloadProgress()
 	if downloaded != 0 || total != 0 {
 		t.Errorf("Expected progress to be 0,0 but got %d,%d", downloaded, total)
 	}
-	
+
 	// Test progress tracking
 	downloader.SetDownloadProgress(500, 1000)
 	downloaded, total = downloader.GetDownloadProgress()
 	if downloaded != 500 || total != 1000 {
 		t.Errorf("Expected progress to be 500,1000 but got %d,%d", downloaded, total)
 	}
-	
+
 	// Test progress reset
 	downloader.ResetDownloadProgress()
 	downloaded, total = downloader.GetDownloadProgress()
@@ -148,13 +148,13 @@ func TestDownloader(t *testing.T) {
 func TestDownloadBook(t *testing.T) {
 	settings := &config.Settings{Quiet: 2}
 	downloader := NewDownloader(settings)
-	
+
 	// Test with nil book
 	err := downloader.DownloadBook(nil, FormatPDF, "/tmp")
 	if err == nil {
 		t.Error("Expected DownloadBook with nil book to return error")
 	}
-	
+
 	// Test with book that has no files in requested format
 	book := &Book{
 		Title: "Test Book",
@@ -162,12 +162,12 @@ func TestDownloadBook(t *testing.T) {
 			{Format: FormatEPUB, URL: "test.epub"},
 		},
 	}
-	
+
 	err = downloader.DownloadBook(book, FormatPDF, "/tmp")
 	if err == nil {
 		t.Error("Expected DownloadBook to return error when format not available")
 	}
-	
+
 	// Test file extension function
 	extensions := map[BookFormat]string{
 		FormatPDF:  "pdf",
@@ -177,7 +177,7 @@ func TestDownloadBook(t *testing.T) {
 		FormatRTF:  "rtf",
 		FormatBRL:  "brl",
 	}
-	
+
 	for format, expectedExt := range extensions {
 		ext := downloader.getFileExtension(format)
 		if ext != expectedExt {
@@ -189,20 +189,20 @@ func TestDownloadBook(t *testing.T) {
 func TestDownloadCategory(t *testing.T) {
 	settings := &config.Settings{Quiet: 2}
 	downloader := NewDownloader(settings)
-	
+
 	// Test with nil category
 	err := downloader.DownloadCategory(nil, FormatPDF, "/tmp")
 	if err == nil {
 		t.Error("Expected DownloadCategory with nil category to return error")
 	}
-	
+
 	// Test with empty category
 	category := &BookCategory{
 		Key:   "test",
 		Name:  "Test Category",
 		Books: []Book{},
 	}
-	
+
 	err = downloader.DownloadCategory(category, FormatPDF, "/tmp")
 	if err != nil {
 		t.Errorf("Expected DownloadCategory with empty category to succeed, got error: %v", err)
@@ -213,7 +213,7 @@ func TestBookModels(t *testing.T) {
 	// Test Book model
 	book := Book{
 		ID:          "test-id",
-		Title:       "Test Book", 
+		Title:       "Test Book",
 		Description: "A test book",
 		Category:    "test-category",
 		Language:    "E",
@@ -228,15 +228,15 @@ func TestBookModels(t *testing.T) {
 			},
 		},
 	}
-	
+
 	if book.ID != "test-id" {
 		t.Errorf("Expected book ID 'test-id', got '%s'", book.ID)
 	}
-	
+
 	if len(book.Files) != 1 {
 		t.Errorf("Expected 1 file, got %d", len(book.Files))
 	}
-	
+
 	if book.Files[0].Format != FormatPDF {
 		t.Errorf("Expected PDF format, got '%s'", book.Files[0].Format)
 	}
@@ -252,11 +252,11 @@ func TestBookCategory(t *testing.T) {
 			{ID: "book2", Title: "Book 2"},
 		},
 	}
-	
+
 	if len(category.Books) != 2 {
 		t.Errorf("Expected 2 books in category, got %d", len(category.Books))
 	}
-	
+
 	if category.Key != "bible-study" {
 		t.Errorf("Expected category key 'bible-study', got '%s'", category.Key)
 	}
@@ -265,7 +265,7 @@ func TestBookCategory(t *testing.T) {
 func TestChecksumValidation(t *testing.T) {
 	settings := &config.Settings{Quiet: 2}
 	downloader := NewDownloader(settings)
-	
+
 	// Create a temporary file for testing
 	tmpFile := "/tmp/test_checksum_file.txt"
 	content := "Hello, World!"
@@ -273,28 +273,32 @@ func TestChecksumValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
-	defer os.Remove(tmpFile)
-	
+	defer func() {
+		if removeErr := os.Remove(tmpFile); removeErr != nil {
+			t.Logf("Warning: failed to remove test file: %v", removeErr)
+		}
+	}()
+
 	// Test with empty checksum (should pass)
 	err = downloader.ValidateChecksum(tmpFile, "")
 	if err != nil {
 		t.Errorf("ValidateChecksum with empty checksum should pass, got error: %v", err)
 	}
-	
+
 	// Test with correct MD5 checksum (MD5 of "Hello, World!" is 65a8e27d8879283831b664bd8b7f0ad4)
 	correctChecksum := "65a8e27d8879283831b664bd8b7f0ad4"
 	err = downloader.ValidateChecksum(tmpFile, correctChecksum)
 	if err != nil {
 		t.Errorf("ValidateChecksum with correct checksum failed: %v", err)
 	}
-	
+
 	// Test with incorrect checksum
 	incorrectChecksum := "wrongchecksum"
 	err = downloader.ValidateChecksum(tmpFile, incorrectChecksum)
 	if err == nil {
 		t.Error("ValidateChecksum with incorrect checksum should fail")
 	}
-	
+
 	// Test with non-existent file
 	err = downloader.ValidateChecksum("/tmp/nonexistent.txt", correctChecksum)
 	if err == nil {
