@@ -1,7 +1,7 @@
 package books
 
 import (
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 - MD5 used for file integrity verification, not cryptographic security
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -135,13 +135,14 @@ func (d *Downloader) ValidateChecksum(filePath, expectedChecksum string) error {
 		return nil // No checksum to validate
 	}
 
+	// #nosec G304 - Path is for file checksum verification in download process
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file for checksum validation: %v", err)
 	}
 	defer func() { _ = file.Close() }()
 
-	hash := md5.New()
+	hash := md5.New() // #nosec G401 - MD5 used for file integrity verification, not cryptographic security
 	if _, err := io.Copy(hash, file); err != nil {
 		return fmt.Errorf("failed to compute checksum: %v", err)
 	}
