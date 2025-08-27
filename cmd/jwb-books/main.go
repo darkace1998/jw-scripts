@@ -123,7 +123,7 @@ func handleListLanguages(client *books.Client) {
 
 func handleListFormats(client *books.Client) {
 	formats := client.GetSupportedFormats()
-	
+
 	fmt.Println("Supported Formats:")
 	fmt.Println("==================")
 	for _, format := range formats {
@@ -176,13 +176,14 @@ func handleSearch(client *books.Client, language, query string) {
 	lang := getLanguageName(client, language)
 	fmt.Printf("Search Results for \"%s\" in %s:\n", query, lang)
 	fmt.Println("=====================================")
-	
+
 	if len(books) == 0 {
 		fmt.Println("No publications found matching your search.")
 		return
 	}
 
-	for _, book := range books {
+	for i := range books {
+		book := &books[i]
 		fmt.Printf("  Title: %s\n", book.Title)
 		fmt.Printf("  ID: %s\n", book.ID)
 		if book.Description != "" {
@@ -191,7 +192,7 @@ func handleSearch(client *books.Client, language, query string) {
 		if book.Issue != "" {
 			fmt.Printf("  Issue: %s\n", book.Issue)
 		}
-		
+
 		// List available formats
 		var formats []string
 		for _, file := range book.Files {
@@ -226,7 +227,7 @@ func handleDownloadCategory(client *books.Client, downloader *books.Downloader, 
 	}
 
 	lang := getLanguageName(client, language)
-	fmt.Printf("Downloading category '%s' in %s format %s to '%s'...\n", 
+	fmt.Printf("Downloading category '%s' in %s format %s to '%s'...\n",
 		category.Name, lang, strings.ToUpper(formatStr), outputDir)
 	fmt.Println()
 
