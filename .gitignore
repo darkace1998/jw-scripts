@@ -5,6 +5,8 @@ coverage.out
 *.log
 *.vtt
 *.mp4
+*.mp3
+/music/
 jwb-books
 media-analysis
 api-analysis
