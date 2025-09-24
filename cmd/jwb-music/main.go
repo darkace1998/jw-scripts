@@ -15,6 +15,16 @@ import (
 
 var settings = &config.Settings{}
 
+// musicCategories defines all the music-related categories available for download
+var musicCategories = []string{
+	"AudioOriginalSongs",
+	"SJJMeetings",
+	"SJJChorus",
+	"SJJInstrumental",
+	"AudioChildrenSongs",
+	"KingdomMelodies",
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "jwb-music",
 	Short: "Download all music files from jw.org",
@@ -39,18 +49,8 @@ By default, it downloads all available music files. Use flags to customize the b
 }
 
 func init() {
-	// Set default music categories
-	defaultMusicCategories := []string{
-		"AudioOriginalSongs",
-		"SJJMeetings",
-		"SJJChorus",
-		"SJJInstrumental",
-		"AudioChildrenSongs",
-		"KingdomMelodies",
-	}
-
 	rootCmd.Flags().BoolVar(&settings.Append, "append", false, "append to file instead of overwriting")
-	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", defaultMusicCategories, "comma separated list of music categories to include")
+	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", musicCategories, "comma separated list of music categories to include")
 	rootCmd.Flags().BoolVar(&settings.ListCategories, "list-categories", false, "list all available music categories")
 	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")
 	rootCmd.Flags().BoolVarP(&settings.Download, "download", "d", true, "download music files (enabled by default)")
@@ -96,14 +96,6 @@ func run(s *config.Settings) error {
 	if s.ListCategories {
 		// Show the music categories that will be downloaded
 		fmt.Println("Available music categories:")
-		musicCategories := []string{
-			"AudioOriginalSongs",
-			"SJJMeetings",
-			"SJJChorus",
-			"SJJInstrumental",
-			"AudioChildrenSongs",
-			"KingdomMelodies",
-		}
 
 		for _, cat := range musicCategories {
 			catResp, err := client.GetCategory(s.Lang, cat)
