@@ -55,6 +55,33 @@ To play downloaded videos, you can use the `jwb-offline` command:
 ./bin/jwb-offline /path/to/your/videos
 ```
 
+#### JW Music Downloads
+
+The `jwb-music` command is a specialized tool for downloading all music files from jw.org:
+
+```bash
+# Download all music files in English
+./bin/jwb-music
+
+# Download music files in Spanish with friendly filenames
+./bin/jwb-music --lang=S --friendly
+
+# List available music categories
+./bin/jwb-music --list-categories
+
+# Download only specific music categories
+./bin/jwb-music --category=AudioOriginalSongs,SJJChorus
+
+# Download to a specific directory
+./bin/jwb-music ./my-music-folder
+```
+
+The command downloads from all music-related categories including:
+- Original Songs
+- "Sing Out Joyfully" (Meetings, Vocals, Instrumental)  
+- Children's Songs
+- Kingdom Melodies
+
 #### JW Publications (Books, Magazines) - Framework Implementation
 
 **Note**: This feature is currently a framework implementation as the JW.org API does not provide access to publications.
