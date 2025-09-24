@@ -81,7 +81,7 @@ jobs:
           fi
           
           # Build each binary
-          for cmd in jwb-index jwb-offline; do
+          for cmd in jwb-index jwb-offline jwb-books; do
             binary_name="${cmd}-${GOOS}-${GOARCH}${EXT}"
             
             env GOOS=$GOOS GOARCH=$GOARCH go build \
@@ -123,12 +123,12 @@ jobs:
         
         Choose the appropriate binary for your platform:
         
-        - **Linux (x64)**: `jwb-index-linux-amd64`, `jwb-offline-linux-amd64`
-        - **Linux (ARM64)**: `jwb-index-linux-arm64`, `jwb-offline-linux-arm64`
-        - **Windows (x64)**: `jwb-index-windows-amd64.exe`, `jwb-offline-windows-amd64.exe`
-        - **Windows (ARM64)**: `jwb-index-windows-arm64.exe`, `jwb-offline-windows-arm64.exe`
-        - **macOS (Intel)**: `jwb-index-darwin-amd64`, `jwb-offline-darwin-amd64`
-        - **macOS (Apple Silicon)**: `jwb-index-darwin-arm64`, `jwb-offline-darwin-arm64`
+        - **Linux (x64)**: `jwb-index-linux-amd64`, `jwb-offline-linux-amd64`, `jwb-books-linux-amd64`
+        - **Linux (ARM64)**: `jwb-index-linux-arm64`, `jwb-offline-linux-arm64`, `jwb-books-linux-arm64`
+        - **Windows (x64)**: `jwb-index-windows-amd64.exe`, `jwb-offline-windows-amd64.exe`, `jwb-books-windows-amd64.exe`
+        - **Windows (ARM64)**: `jwb-index-windows-arm64.exe`, `jwb-offline-windows-arm64.exe`, `jwb-books-windows-arm64.exe`
+        - **macOS (Intel)**: `jwb-index-darwin-amd64`, `jwb-offline-darwin-amd64`, `jwb-books-darwin-amd64`
+        - **macOS (Apple Silicon)**: `jwb-index-darwin-arm64`, `jwb-offline-darwin-arm64`, `jwb-books-darwin-arm64`
         
         Or download the complete archives:
         - Platform-specific `.tar.gz` (Linux/macOS) or `.zip` (Windows) files
@@ -137,13 +137,14 @@ jobs:
         
         After downloading, make the binaries executable (Linux/macOS):
         ```bash
-        chmod +x jwb-index-* jwb-offline-*
+        chmod +x jwb-index-* jwb-offline-* jwb-books-*
         ```
         
         For help with commands:
         ```bash
         ./jwb-index --help
         ./jwb-offline --help
+        ./jwb-books --help
         ```
         
         ### Verification
