@@ -47,7 +47,7 @@ func init() {
 	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of media files from this directory (offline)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
-	rootCmd.Flags().BoolVarP(&settings.Latest, "latest", "L", false, "fetch subtitles and videos from the past 31 days up to today (31-day window ending today)")
+	rootCmd.Flags().BoolVarP(&settings.Latest, "latest", false, "fetch subtitles and videos from the past 31 days up to today (31-day window ending today)")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.PrintCategory, "list-categories", "C", "", "print a list of (sub) category names")
 	rootCmd.Flags().StringVarP(&settings.Mode, "mode", "m", "", "output mode (filesystem, html, m3u, run, stdout, txt)")
