@@ -133,17 +133,18 @@ func run(s *config.Settings) error {
 	}
 
 	if s.Latest {
-		// Set date range for 31-day window starting from today when --latest flag is used
+		// Set date range for 31-day window: from today back to 31 days ago when --latest flag is used
 		now := time.Now()
 		startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		endOfPeriod := startOfToday.AddDate(0, 0, 31).Add(-time.Nanosecond) // End of day 31 days from today
+		thirtyOneDaysAgo := startOfToday.AddDate(0, 0, -31)
+		endOfToday := startOfToday.AddDate(0, 0, 1).Add(-time.Nanosecond) // End of today
 
-		s.MinDate = startOfToday.Unix()
-		s.MaxDate = endOfPeriod.Unix()
+		s.MinDate = thirtyOneDaysAgo.Unix()
+		s.MaxDate = endOfToday.Unix()
 
 		if s.Quiet < 1 {
-			fmt.Fprintf(os.Stderr, "filtering to content from %s through %s (31-day window)\n",
-				startOfToday.Format("2006-01-02"), endOfPeriod.Format("2006-01-02"))
+			fmt.Fprintf(os.Stderr, "filtering to content from %s through %s (past 31 days)\n",
+				thirtyOneDaysAgo.Format("2006-01-02"), endOfToday.Format("2006-01-02"))
 		}
 	}
 
