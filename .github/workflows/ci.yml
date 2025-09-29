@@ -3,8 +3,6 @@ name: CI
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   schedule:
     # Run tests weekly on Sundays at 00:00 UTC
     - cron: '0 0 * * 0'
@@ -15,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.22', '1.23', '1.24']
+        go-version: ['1.25', '1.24']
     
     steps:
     - name: Checkout code
