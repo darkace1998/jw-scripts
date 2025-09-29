@@ -1,5 +1,6 @@
 /bin/
 /jwb*/
+jwb-index
 /dist/
 coverage.out
 *.log
