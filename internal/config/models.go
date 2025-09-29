@@ -13,6 +13,7 @@ type Settings struct {
 	Quality           int
 	HardSubtitles     bool
 	MinDate           int64
+	MaxDate           int64
 	IncludeCategories []string
 	ExcludeCategories []string
 	FilterCategories  []string

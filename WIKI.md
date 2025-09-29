@@ -22,7 +22,7 @@ The `jwb-index` command is used to index and download media from jw.org.
 | `--import` | | `""` | import of media files from this directory (offline) |
 | `--lang` | `-l` | `E` | language code |
 | `--languages` | `-L` | `false` | display a list of valid language codes |
-| `--latest` | | `false` | index the "Latest Videos" category only |
+| `--latest` | | `false` | fetch subtitles and videos from today through the next 31 days (31-day window starting from today) |
 | `--limit-rate` | `-R` | `1.0` | maximum download rate, in megabytes/s |
 | `--list-categories` | `-C` | `""` | print a list of (sub) category names |
 | `--mode` | `-m` | `""` | output mode (filesystem, html, m3u, run, stdout, txt) |
