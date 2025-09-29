@@ -227,6 +227,9 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 					if date.Unix() < c.settings.MinDate {
 						continue
 					}
+					if c.settings.MaxDate > 0 && date.Unix() > c.settings.MaxDate {
+						continue
+					}
 					media.Date = date.Unix()
 				}
 			}
