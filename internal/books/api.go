@@ -1,3 +1,4 @@
+// Package books provides functionality for downloading JW publications.
 package books
 
 import "time"

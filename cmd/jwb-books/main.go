@@ -1,3 +1,4 @@
+// Package main provides the jwb-books command for downloading JW publications.
 package main
 
 import (

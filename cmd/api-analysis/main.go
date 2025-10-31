@@ -1,3 +1,4 @@
+// Package main provides API analysis tools for JW Broadcasting.
 package main
 
 import (

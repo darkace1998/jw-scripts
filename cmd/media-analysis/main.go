@@ -1,3 +1,4 @@
+// Package main provides media analysis for JW Broadcasting content.
 package main
 
 import (

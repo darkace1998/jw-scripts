@@ -85,7 +85,7 @@ func (c *Client) GetSupportedLanguages() ([]Language, error) {
 }
 
 // GetCategories returns all available book categories
-func (c *Client) GetCategories(lang string) ([]BookCategory, error) {
+func (c *Client) GetCategories(_ string) ([]BookCategory, error) {
 	// Pre-defined categories based on known publication types
 	categories := []BookCategory{
 		{

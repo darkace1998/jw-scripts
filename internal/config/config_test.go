@@ -1,3 +1,4 @@
+// Package config provides configuration settings for JW scripts.
 package config
 
 import (

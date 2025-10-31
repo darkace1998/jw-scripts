@@ -1,3 +1,4 @@
+// Package main provides the jwb-music command for downloading JW music files.
 package main
 
 import (
@@ -37,7 +38,7 @@ It downloads from all music-related categories including:
 - Kingdom Melodies
 
 By default, it downloads all available music files. Use flags to customize the behavior.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		if len(args) > 0 {
 			settings.WorkDir = args[0]
 		}

@@ -1,3 +1,4 @@
+// Package main provides subtitle counting tests for JW Broadcasting content.
 package main
 
 import (

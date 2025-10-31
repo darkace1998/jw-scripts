@@ -1,3 +1,4 @@
+// Package main provides a character analysis tool for JW Broadcasting media filenames.
 package main
 
 import (
@@ -32,7 +33,7 @@ func main() {
 
 	var totalMedia int
 	var problematicMedia []ProblematicItem
-	var characterStats map[rune]int = make(map[rune]int)
+	characterStats := make(map[rune]int)
 	var filenameCollisions []FilenameCollision
 
 	// Track what happens with SafeFilenames=true vs false

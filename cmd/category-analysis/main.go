@@ -1,3 +1,4 @@
+// Package main provides category analysis for JW Broadcasting content.
 package main
 
 import (
