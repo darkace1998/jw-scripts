@@ -1,6 +1,5 @@
 //go:build !windows
 
-// Package downloader provides file downloading functionality with rate limiting.
 package downloader
 
 import (
