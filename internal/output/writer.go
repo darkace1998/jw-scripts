@@ -1,3 +1,4 @@
+// Package output provides various output writers for media content.
 package output
 
 import (

@@ -1,3 +1,4 @@
+// Package downloader provides file downloading functionality with rate limiting.
 package downloader
 
 import (
@@ -228,7 +229,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 }
 
 // DownloadFile downloads a file from a URL to a specified path.
-func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit float64) error {
+func DownloadFile(_ *config.Settings, url, path string, resume bool, rateLimit float64) error {
 	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return err

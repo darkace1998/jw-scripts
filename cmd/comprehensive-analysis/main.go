@@ -1,3 +1,4 @@
+// Package main provides comprehensive analysis of JW Broadcasting data.
 package main
 
 import (

@@ -1,3 +1,4 @@
+// Package player provides media playback functionality.
 package player
 
 import (

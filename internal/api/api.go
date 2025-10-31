@@ -1,3 +1,4 @@
+// Package api provides client and data structures for interacting with the JW.org API.
 package api
 
 // Category represents a category of media on JW Broadcasting.
