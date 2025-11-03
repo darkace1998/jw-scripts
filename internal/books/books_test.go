@@ -84,7 +84,7 @@ func TestClientMethods(t *testing.T) {
 	}
 
 	// These should now work with the real API!
-	categories, err := client.GetCategories("E")
+	categories, err := client.GetCategories()
 	if err != nil {
 		t.Errorf("GetCategories returned error: %v", err)
 	}

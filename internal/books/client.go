@@ -85,7 +85,7 @@ func (c *Client) GetSupportedLanguages() ([]Language, error) {
 }
 
 // GetCategories returns all available book categories
-func (c *Client) GetCategories(_ string) ([]BookCategory, error) {
+func (c *Client) GetCategories() ([]BookCategory, error) {
 	// Pre-defined categories based on known publication types
 	categories := []BookCategory{
 		{
@@ -131,7 +131,7 @@ func (c *Client) GetCategories(_ string) ([]BookCategory, error) {
 
 // GetCategory returns books in a specific category
 func (c *Client) GetCategory(lang, categoryKey string) (*BookCategory, error) {
-	categories, err := c.GetCategories(lang)
+	categories, err := c.GetCategories()
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 // SearchBooks searches for books by title or content
 func (c *Client) SearchBooks(lang, query string) ([]Book, error) {
 	// Get all categories and search through them
-	categories, err := c.GetCategories(lang)
+	categories, err := c.GetCategories()
 	if err != nil {
 		return nil, err
 	}

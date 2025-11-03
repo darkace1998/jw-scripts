@@ -16,11 +16,6 @@ linters:
     - gosec
     - gocritic
 
-formatters:
-  enable:
-    - gofmt
-    - goimports
-
 linters-settings:
   revive:
     severity: warning
