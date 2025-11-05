@@ -1,3 +1,4 @@
+// Package main provides the jwb-books command for downloading JW publications.
 package main
 
 import (
@@ -149,7 +150,7 @@ func handleListFormats(client *books.Client) {
 }
 
 func handleListCategories(client *books.Client, language string) {
-	categories, err := client.GetCategories(language)
+	categories, err := client.GetCategories()
 	if err != nil {
 		fmt.Printf("Error getting categories: %v\n", err)
 		os.Exit(1)

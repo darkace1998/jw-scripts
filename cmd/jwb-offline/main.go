@@ -1,3 +1,4 @@
+// Package main provides the jwb-offline command for playing downloaded JW videos.
 package main
 
 import (
@@ -16,7 +17,7 @@ var playerCmd []string
 var rootCmd = &cobra.Command{
 	Use:   "jwb-offline [DIR]",
 	Short: "Shuffle and play videos in DIR",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		if len(args) > 0 {
 			settings.WorkDir = args[0]
 		}

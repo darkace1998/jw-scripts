@@ -79,7 +79,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 		return fmt.Errorf("failed to create parent directory for %s: %v", outputPath, err)
 	}
 
-	return downloader.DownloadFile(d.settings, targetFile.URL, outputPath, false, d.settings.RateLimit)
+	return downloader.DownloadFile(targetFile.URL, outputPath, false, d.settings.RateLimit)
 }
 
 // DownloadCategory downloads all books in a category

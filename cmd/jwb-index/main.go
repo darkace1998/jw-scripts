@@ -1,3 +1,4 @@
+// Package main provides the jwb-index command for downloading JW Broadcasting media.
 package main
 
 import (
@@ -19,7 +20,7 @@ var settings = &config.Settings{}
 var rootCmd = &cobra.Command{
 	Use:   "jwb-index",
 	Short: "Index or download media from jw.org",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		if len(args) > 0 {
 			settings.WorkDir = args[0]
 		}

@@ -58,7 +58,7 @@ func TestStdoutWriter(t *testing.T) {
 	}
 }
 
-func TestCommandWriter(t *testing.T) {
+func TestCommandWriter(_ *testing.T) {
 	settings := &config.Settings{
 		Command: []string{"echo", "test"},
 	}

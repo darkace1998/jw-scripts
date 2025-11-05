@@ -84,7 +84,7 @@ func TestClientMethods(t *testing.T) {
 	}
 
 	// These should now work with the real API!
-	categories, err := client.GetCategories("E")
+	categories, err := client.GetCategories()
 	if err != nil {
 		t.Errorf("GetCategories returned error: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestChecksumValidation(t *testing.T) {
 	// Create a temporary file for testing
 	tmpFile := "/tmp/test_checksum_file.txt"
 	content := "Hello, World!"
-	err := os.WriteFile(tmpFile, []byte(content), 0644)
+	err := os.WriteFile(tmpFile, []byte(content), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}

@@ -1,3 +1,4 @@
+// Package books provides functionality for downloading JW publications.
 package books
 
 import "time"
@@ -67,7 +68,7 @@ type BookAPI interface {
 	GetSupportedLanguages() ([]Language, error)
 
 	// GetCategories returns all available book categories
-	GetCategories(lang string) ([]BookCategory, error)
+	GetCategories() ([]BookCategory, error)
 
 	// GetCategory returns books in a specific category
 	GetCategory(lang, categoryKey string) (*BookCategory, error)

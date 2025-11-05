@@ -1,3 +1,4 @@
+// Package downloader provides file downloading functionality with rate limiting.
 package downloader
 
 import (
@@ -116,7 +117,7 @@ func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory 
 			fmt.Fprintf(os.Stderr, "[%d/%d] downloading: %s\n", i+1, len(queue), media.SubtitleFilename)
 		}
 		subtitlePath := filepath.Join(directory, media.SubtitleFilename)
-		if err := DownloadFile(s, media.SubtitleURL, subtitlePath, false, 0); err != nil {
+		if err := DownloadFile(media.SubtitleURL, subtitlePath, false, 0); err != nil {
 			if s.Quiet < 2 {
 				fmt.Fprintf(os.Stderr, "failed to download subtitle %s: %v\n", media.SubtitleFilename, err)
 			}
@@ -173,7 +174,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 		if s.Quiet < 2 {
 			fmt.Fprintf(os.Stderr, "resuming: %s (%s)\n", media.Filename, media.Name)
 		}
-		if err := DownloadFile(s, media.URL, tmpFile, true, s.RateLimit); err != nil {
+		if err := DownloadFile(media.URL, tmpFile, true, s.RateLimit); err != nil {
 			return err
 		}
 
@@ -189,7 +190,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 					if err := os.Remove(tmpFile); err != nil {
 						return err
 					}
-					if err := DownloadFile(s, media.URL, tmpFile, false, s.RateLimit); err != nil {
+					if err := DownloadFile(media.URL, tmpFile, false, s.RateLimit); err != nil {
 						return err
 					}
 				} else if s.Checksums && media.MD5 != "" {
@@ -201,7 +202,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 						if err := os.Remove(tmpFile); err != nil {
 							return err
 						}
-						if err := DownloadFile(s, media.URL, tmpFile, false, s.RateLimit); err != nil {
+						if err := DownloadFile(media.URL, tmpFile, false, s.RateLimit); err != nil {
 							return err
 						}
 					}
@@ -212,7 +213,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 		if s.Quiet < 2 {
 			fmt.Fprintf(os.Stderr, "downloading: %s (%s)\n", media.Filename, media.Name)
 		}
-		if err := DownloadFile(s, media.URL, tmpFile, false, s.RateLimit); err != nil {
+		if err := DownloadFile(media.URL, tmpFile, false, s.RateLimit); err != nil {
 			return err
 		}
 	}
@@ -228,7 +229,7 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 }
 
 // DownloadFile downloads a file from a URL to a specified path.
-func DownloadFile(s *config.Settings, url, path string, resume bool, rateLimit float64) error {
+func DownloadFile(url, path string, resume bool, rateLimit float64) error {
 	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return err

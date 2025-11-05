@@ -1,3 +1,4 @@
+// Package main provides subtitle diagnostics for JW Broadcasting content.
 package main
 
 import (
