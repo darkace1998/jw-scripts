@@ -1,4 +1,4 @@
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -16,38 +16,22 @@ linters:
     - gosec
     - gocritic
 
-linters-settings:
-  revive:
-    severity: warning
-    rules:
-      - name: exported
-        severity: warning
-        disabled: false
-  gosec:
-    excludes:
-      - G104 # Audit errors not checked
-      - G204 # Subprocess launched with potentially tainted input - intentional functionality
-      - G304 # Potential file inclusion via variable - intentional functionality  
-      - G401 # Use of weak cryptographic primitive - MD5 used for checksums not security
-      - G501 # Blocklisted import crypto/md5 - MD5 used for checksums not security
-      - G115 # Integer overflow conversion - system level operations
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - unnamedResult
-      - hugeParam
+  settings:
+    revive:
+      severity: warning
+      rules:
+        - name: exported
+          severity: warning
+          disabled: false
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - unnamedResult
+        - hugeParam
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
-  
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gosec
-        - gocritic
