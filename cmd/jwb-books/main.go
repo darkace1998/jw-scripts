@@ -168,7 +168,7 @@ func handleListCategories(client *books.Client, language string) {
 }
 
 func handleSearch(client *books.Client, language, query string) {
-	books, err := client.SearchBooks(language, query)
+	results, err := client.SearchBooks(language, query)
 	if err != nil {
 		fmt.Printf("Error searching: %v\n", err)
 		os.Exit(1)
@@ -178,13 +178,13 @@ func handleSearch(client *books.Client, language, query string) {
 	fmt.Printf("Search Results for \"%s\" in %s:\n", query, lang)
 	fmt.Println("=====================================")
 
-	if len(books) == 0 {
+	if len(results) == 0 {
 		fmt.Println("No publications found matching your search.")
 		return
 	}
 
-	for i := range books {
-		book := &books[i]
+	for i := range results {
+		book := &results[i]
 		fmt.Printf("  Title: %s\n", book.Title)
 		fmt.Printf("  ID: %s\n", book.ID)
 		if book.Description != "" {
