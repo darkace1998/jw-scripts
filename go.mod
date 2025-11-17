@@ -1,4 +1,4 @@
-module github.com/allejok96/jwb-go
+module github.com/darkace1998/jw-scripts
 
 go 1.24.0
 

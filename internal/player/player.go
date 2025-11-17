@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/allejok96/jwb-go/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/config"
 )
 
 // VideoManager manages the video playback.

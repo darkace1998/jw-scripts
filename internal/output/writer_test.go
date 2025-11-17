@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/allejok96/jwb-go/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/config"
 )
 
 func TestPlaylistEntry(t *testing.T) {

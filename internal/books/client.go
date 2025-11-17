@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/allejok96/jwb-go/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/config"
 )
 
 // Client implements the BookAPI interface for JW.org book operations

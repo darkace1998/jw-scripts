@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/allejok96/jwb-go/internal/config"
-	"github.com/allejok96/jwb-go/internal/downloader"
+	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/downloader"
 )
 
 // Downloader implements the BookDownloader interface

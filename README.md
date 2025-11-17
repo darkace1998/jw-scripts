@@ -1,16 +1,16 @@
 # JW Scripts (Go Version)
 
+This project is a Go-based reimplementation of the [original Python scripts](https://github.com/allejok96/jw-scripts) for interacting with jw.org content. It offers improved performance and modern features while maintaining compatibility with the original command-line flags.
+
 *These methods of accessing jw.org are, while legal, not officially supported by the organisation. Use them if you find it worth the time, pain and risk. But first, please take the time to read [w18.04 30-31](https://wol.jw.org/en/wol/d/r1/lp-e/2018364). Then consider buying a device which has official support for JW Broadcasting app. Like a Roku, Apple TV or Amazon Fire TV. It will give you a better and safer experience.*
 
 ### JW Broadcasting and Publications anywhere
 
 With these scripts you can get the latest JW Broadcasting videos and publications automatically downloaded. You can turn a computer (like a Raspberry Pi) into a JW TV, either by streaming directly, or by playing downloaded videos from your collection.
 
-**Note**: The publication download feature (`jwb-books`) is currently a framework implementation. The JW.org API does not currently provide access to publications/books - only broadcasting content (videos and audio). See [docs/BOOK_DOWNLOAD_ANALYSIS.md](docs/BOOK_DOWNLOAD_ANALYSIS.md) for details.
-
 ## Get started
 
-This project is now written in Go. You have two options to get started:
+You have two options to get started with the Go version of JW Scripts:
 
 ### Option 1: Download Pre-built Binaries (Recommended)
 
@@ -31,10 +31,10 @@ If you prefer to build from source, you will need to have Go installed on your s
 
 ### Building the project
 
-To build the `jwb-index` and `jwb-offline` executables, run the following command from the root of the project:
+To build all the command-line tools, run the following command from the root of the project:
 
 ```bash
-go build -o bin/ ./...
+go build -o bin/ ./cmd/...
 ```
 
 This will create the executables in a `bin` directory.
@@ -46,7 +46,7 @@ This will create the executables in a `bin` directory.
 For example, to download the latest videos in Swedish, you would run:
 
 ```bash
-./bin/jwb-index --download --latest --lang=Z
+./bin/jwb-index --download --latest --lang=S
 ```
 
 To play downloaded videos, you can use the `jwb-offline` command:
@@ -87,20 +87,26 @@ The command downloads from all music-related categories including:
 **Note**: This feature is currently a framework implementation as the JW.org API does not provide access to publications.
 
 ```bash
-# Check API status and limitations
-./bin/jwb-books
+# Display help information
+./bin/jwb-books --help
 
-# List available book categories (when API becomes available)
-./bin/jwb-books --list-categories
+# List supported languages
+./bin/jwb-books --list-languages
 
-# Download books by category in PDF format (when API becomes available)  
-./bin/jwb-books --category=bible-study --format=pdf --output=./books
+# List available book categories
+./bin/jwb-books --list-categories --language E
 
-# Download magazines in EPUB format (when API becomes available)
-./bin/jwb-books --category=magazines --format=epub --output=./publications
+# List supported download formats
+./bin/jwb-books --list-formats
 
-# Search for specific publications (when API becomes available)
-./bin/jwb-books --search="watchtower 2024"
+# Search for specific publications
+./bin/jwb-books --search="watchtower" --language E
+
+# Download books by category in PDF format
+./bin/jwb-books --category=bible-study --language E --format=pdf --output=./books
+
+# Download magazines in EPUB format
+./bin/jwb-books --category=magazines --language E --format=epub --output=./publications
 ```
 
 See [docs/BOOK_DOWNLOAD_ANALYSIS.md](docs/BOOK_DOWNLOAD_ANALYSIS.md) for detailed information about the API analysis and framework implementation.
@@ -108,24 +114,6 @@ See [docs/BOOK_DOWNLOAD_ANALYSIS.md](docs/BOOK_DOWNLOAD_ANALYSIS.md) for detaile
 Next, check out the [Wiki pages](https://github.com/allejok96/jw-scripts/wiki) for more examples and options. The command-line flags are the same as the original Python version.
 
 ## Questions
-
-#### Isn't there an easier way to watch JW Broadcasting in Kodi?
-
-Yes, I'm keeping an add-on alive [here](https://github.com/allejok96/plugin.video.jwb-unofficial).
-
-#### Why is the video download so slow?
-
-~~It seems to be realated to the `--limit-rate` flag ([why?](https://github.com/allejok96/jw-scripts/wiki/How-it-works#batch-downloading)).~~ 
-
-**Fixed!** The rate limiting implementation has been improved to provide smooth downloads at the specified rate limits without the previous throttling issues.
-
-*But please, somebody think of the servers!* :-)
-
-#### What happened to the script for Bible recordings?
-
-Since all recordings can be easily downloaded from the website, and the script couldn't do more than one publication at a time I didn't see any practical use for it.
-
-But checkout [@vbastianpc](https://github.com/vbastianpc)'s nice fork of it that can download sign language publications.
 
 #### Is this legal?
 

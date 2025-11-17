@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/allejok96/jwb-go/internal/books"
-	"github.com/allejok96/jwb-go/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/books"
+	"github.com/darkace1998/jw-scripts/internal/config"
 )
 
 func main() {

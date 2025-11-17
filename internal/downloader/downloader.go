@@ -12,8 +12,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/allejok96/jwb-go/internal/api"
-	"github.com/allejok96/jwb-go/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/api"
+	"github.com/darkace1998/jw-scripts/internal/config"
 	"github.com/schollz/progressbar/v3"
 )
 

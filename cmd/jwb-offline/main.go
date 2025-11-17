@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/allejok96/jwb-go/internal/config"
-	"github.com/allejok96/jwb-go/internal/player"
+	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/player"
 	"github.com/spf13/cobra"
 )
 

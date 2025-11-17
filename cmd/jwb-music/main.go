@@ -7,10 +7,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/allejok96/jwb-go/internal/api"
-	"github.com/allejok96/jwb-go/internal/config"
-	"github.com/allejok96/jwb-go/internal/downloader"
-	"github.com/allejok96/jwb-go/internal/output"
+	"github.com/darkace1998/jw-scripts/internal/api"
+	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/downloader"
+	"github.com/darkace1998/jw-scripts/internal/output"
 	"github.com/spf13/cobra"
 )
 
