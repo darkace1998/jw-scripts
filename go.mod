@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.9
 
 require (
-	github.com/schollz/progressbar/v3 v3.18.0
+	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/spf13/cobra v1.10.1
 )
 
