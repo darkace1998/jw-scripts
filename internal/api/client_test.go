@@ -326,6 +326,18 @@ func TestParseDate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:      "valid RFC3339 date with positive timezone offset",
+			dateStr:   "2021-06-25T12:00:00+02:00",
+			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC), // 12:00 +02:00 = 10:00 UTC
+			expectErr: false,
+		},
+		{
+			name:      "valid RFC3339 date with negative timezone offset",
+			dateStr:   "2021-06-25T05:00:00-05:00",
+			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC), // 05:00 -05:00 = 10:00 UTC
+			expectErr: false,
+		},
+		{
 			name:      "invalid date",
 			dateStr:   "not a date",
 			want:      time.Time{},

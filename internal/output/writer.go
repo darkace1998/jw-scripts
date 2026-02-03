@@ -284,12 +284,16 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("output filename is required for txt mode")
 	}
-	// Validate that the filename doesn't contain path traversal or is just path separators
-	if filepath.Base(filename) != filename && !filepath.IsAbs(filepath.Join(s.WorkDir, filename)) {
-		return nil, fmt.Errorf("invalid output filename: %s", filename)
+	// Validate that the resulting path stays within the work directory to prevent path traversal
+	fullPath := filepath.Join(s.WorkDir, filename)
+	cleanPath := filepath.Clean(fullPath)
+	workDirAbs, _ := filepath.Abs(s.WorkDir)
+	cleanPathAbs, _ := filepath.Abs(cleanPath)
+	if !strings.HasPrefix(cleanPathAbs, workDirAbs) {
+		return nil, fmt.Errorf("invalid output filename: path traversal detected in %s", filename)
 	}
 	// #nosec G304 - Path is user-configured output file for legitimate file operations
-	file, err := os.Create(filepath.Join(s.WorkDir, filename))
+	file, err := os.Create(cleanPath)
 	if err != nil {
 		return nil, err
 	}
