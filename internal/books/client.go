@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
 )
@@ -44,9 +45,11 @@ type FileInfo struct {
 // NewClient creates a new book API client
 func NewClient(s *config.Settings) *Client {
 	return &Client{
-		baseURL:    "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS",
-		httpClient: &http.Client{},
-		settings:   s,
+		baseURL: "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS",
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		settings: s,
 	}
 }
 

@@ -308,23 +308,20 @@ func TestParseDate(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "valid date with milliseconds",
+			name:      "valid RFC3339 date with milliseconds",
 			dateStr:   "2021-06-25T10:00:00.123Z",
+			want:      time.Date(2021, 6, 25, 10, 0, 0, 123000000, time.UTC),
+			expectErr: false,
+		},
+		{
+			name:      "valid date without milliseconds",
+			dateStr:   "2021-06-25T10:00:00",
 			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC),
 			expectErr: false,
 		},
 		{
-			name:    "valid date without milliseconds",
-			dateStr: "2021-06-25T10:00:00",
-			// The original function strips the Z, so this will be parsed as local time.
-			// Let's adjust the test to handle this.
-			// No, the original function's regex only strips `.123Z`. It doesn't handle a missing `Z`.
-			// Let's re-read the function.
-			// `re := regexp.MustCompile(`\.[0-9]+Z$`)`
-			// `dateString = re.ReplaceAllString(dateString, "")`
-			// `return time.Parse("2006-01-02T15:04:05", dateString)`
-			// If the input is "2021-06-25T10:00:00", the regex doesn't match, and it's passed to time.Parse.
-			// time.Parse without a zone will assume UTC. So my original assumption was correct.
+			name:      "valid RFC3339 date without milliseconds",
+			dateStr:   "2021-06-25T10:00:00Z",
 			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC),
 			expectErr: false,
 		},

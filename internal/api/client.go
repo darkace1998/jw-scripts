@@ -28,9 +28,11 @@ type Client struct {
 // NewClient creates a new API client.
 func NewClient(s *config.Settings) *Client {
 	return &Client{
-		baseURL:    baseURL,
-		httpClient: &http.Client{},
-		settings:   s,
+		baseURL: baseURL,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		settings: s,
 	}
 }
 
@@ -300,9 +302,36 @@ func getBestVideo(files []File, quality int, subtitles bool) *File {
 }
 
 func parseDate(dateString string) (time.Time, error) {
+	// Try parsing with RFC3339 format first (includes timezone)
+	if t, err := time.Parse(time.RFC3339, dateString); err == nil {
+		return t.UTC(), nil
+	}
+	// Strip milliseconds and parse as UTC
 	re := regexp.MustCompile(`\.\d+Z$`)
 	dateString = re.ReplaceAllString(dateString, "")
-	return time.Parse("2006-01-02T15:04:05", dateString)
+	t, err := time.Parse("2006-01-02T15:04:05", dateString)
+	if err != nil {
+		return time.Time{}, err
+	}
+	// Return time in UTC since API timestamps are typically in UTC
+	return t.UTC(), nil
+}
+
+// isWindowsReservedName checks if a filename is a Windows reserved name
+func isWindowsReservedName(name string) bool {
+	// Windows reserved names (case-insensitive)
+	reserved := []string{
+		"CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+	}
+	nameUpper := strings.ToUpper(strings.TrimSuffix(name, filepath.Ext(name)))
+	for _, r := range reserved {
+		if nameUpper == r {
+			return true
+		}
+	}
+	return false
 }
 
 func formatFilename(s string, safe bool) string {
@@ -314,12 +343,24 @@ func formatFilename(s string, safe bool) string {
 	} else {
 		forbidden = "/\x00"
 	}
-	return strings.Map(func(r rune) rune {
+	result := strings.Map(func(r rune) rune {
 		if strings.ContainsRune(forbidden, r) {
 			return -1
 		}
 		return r
 	}, s)
+
+	if safe {
+		// Remove trailing dots and spaces (problematic on Windows)
+		result = strings.TrimRight(result, ". ")
+		// Handle Windows reserved names by prefixing with underscore
+		if isWindowsReservedName(result) {
+			ext := filepath.Ext(result)
+			nameWithoutExt := strings.TrimSuffix(result, ext)
+			result = "_" + nameWithoutExt + ext
+		}
+	}
+	return result
 }
 
 func getFilename(url string, safe bool) string {

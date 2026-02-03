@@ -162,13 +162,21 @@ func main() {
 		}
 	}
 
-	// Save analysis results
+	// Save analysis results - handle empty slices gracefully
+	var problematicSamples []ProblematicItem
+	if len(problematicMedia) > 0 {
+		problematicSamples = problematicMedia[:minInt(len(problematicMedia), 50)]
+	}
+	var collisionSamples []FilenameCollision
+	if len(filenameCollisions) > 0 {
+		collisionSamples = filenameCollisions[:minInt(len(filenameCollisions), 50)]
+	}
 	analysis := map[string]interface{}{
 		"total_media":         totalMedia,
 		"problematic_items":   len(problematicMedia),
 		"filename_collisions": len(filenameCollisions),
-		"problematic_samples": problematicMedia[:minInt(len(problematicMedia), 50)],
-		"collision_samples":   filenameCollisions[:minInt(len(filenameCollisions), 50)],
+		"problematic_samples": problematicSamples,
+		"collision_samples":   collisionSamples,
 		"character_stats":     characterStats,
 	}
 
@@ -178,13 +186,11 @@ func main() {
 		fmt.Printf("Warning: could not create temp file: %v\n", err)
 		return
 	}
-	defer func() {
-		if closeErr := tmpFile.Close(); closeErr != nil {
-			fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
-		}
-	}()
 
-	err = os.WriteFile(tmpFile.Name(), jsonData, 0o600)
+	_, err = tmpFile.Write(jsonData)
+	if closeErr := tmpFile.Close(); closeErr != nil {
+		fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
+	}
 	if err != nil {
 		fmt.Printf("Warning: could not save analysis data: %v\n", err)
 	} else {

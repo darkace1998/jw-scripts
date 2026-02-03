@@ -102,6 +102,11 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 			continue
 		}
 
+		// Skip categories with empty keys to avoid invalid filenames
+		if category.Key == "" {
+			continue
+		}
+
 		sortMedia(categoryMedia, s.Sort)
 
 		// Create separate output file for each category
@@ -278,6 +283,10 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	filename := s.OutputFilename
 	if filename == "" {
 		return nil, fmt.Errorf("output filename is required for txt mode")
+	}
+	// Validate that the filename doesn't contain path traversal or is just path separators
+	if filepath.Base(filename) != filename && !filepath.IsAbs(filepath.Join(s.WorkDir, filename)) {
+		return nil, fmt.Errorf("invalid output filename: %s", filename)
 	}
 	// #nosec G304 - Path is user-configured output file for legitimate file operations
 	file, err := os.Create(filepath.Join(s.WorkDir, filename))

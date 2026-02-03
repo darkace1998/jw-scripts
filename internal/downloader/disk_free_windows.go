@@ -26,7 +26,7 @@ func getFreeDiskSpace(path string) (uint64, error) {
 		return 0, dllLoadErr
 	}
 
-	var freeBytes int64
+	var freeBytes uint64
 
 	pathPtr, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
@@ -44,5 +44,5 @@ func getFreeDiskSpace(path string) (uint64, error) {
 		return 0, err
 	}
 
-	return uint64(freeBytes), nil
+	return freeBytes, nil
 }

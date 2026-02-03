@@ -70,7 +70,11 @@ func main() {
 	fmt.Printf("  Total Categories: %d\n", len(data))
 	fmt.Printf("  Total Media Items: %d\n", totalMedia)
 	fmt.Printf("  Total with Subtitles: %d\n", totalWithSubtitles)
-	fmt.Printf("  Subtitle Ratio: %.2f%%\n", float64(totalWithSubtitles)/float64(totalMedia)*100)
+	if totalMedia > 0 {
+		fmt.Printf("  Subtitle Ratio: %.2f%%\n", float64(totalWithSubtitles)/float64(totalMedia)*100)
+	} else {
+		fmt.Printf("  Subtitle Ratio: N/A (no media items)\n")
+	}
 	fmt.Println()
 
 	// Sort categories by subtitle count for better analysis

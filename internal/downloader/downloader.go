@@ -331,7 +331,9 @@ func diskCleanup(s *config.Settings, directory string, referenceMedia *api.Media
 
 		needed := referenceMedia.Size + s.KeepFree
 		if needed < 0 {
-			// Overflow or negative values - skip the check
+			// Integer overflow detected: referenceMedia.Size + s.KeepFree exceeded int64 max value
+			// This can happen with very large file sizes on 32-bit systems
+			// Skip the disk space check to avoid incorrect behavior
 			break
 		}
 		if free > uint64(needed) {

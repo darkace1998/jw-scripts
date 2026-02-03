@@ -204,25 +204,14 @@ func main() {
 		fmt.Printf("Warning: could not create temp file: %v\n", err)
 		return
 	}
-	defer func() {
-		if closeErr := tmpFile.Close(); closeErr != nil {
-			fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
-		}
-	}()
 
-	err = os.WriteFile(tmpFile.Name(), jsonData, 0o600)
+	_, err = tmpFile.Write(jsonData)
+	if closeErr := tmpFile.Close(); closeErr != nil {
+		fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
+	}
 	if err != nil {
 		fmt.Printf("Warning: could not save API analysis: %v\n", err)
 	} else {
 		fmt.Printf("\nAPI analysis saved to %s\n", tmpFile.Name())
 	}
-}
-
-// RootCategory represents a top-level category from the API response
-type RootCategory struct {
-	Key         string   `json:"key"`
-	Type        string   `json:"type"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
 }
