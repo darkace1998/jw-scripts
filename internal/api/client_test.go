@@ -313,13 +313,13 @@ func TestFormatFilename(t *testing.T) {
 			want: "_con.mp4",
 		},
 		{
-			name: "trailing dots removed",
+			name: "dots in middle of filename preserved",
 			s:    "file..txt",
 			safe: true,
 			want: "file..txt",
 		},
 		{
-			name: "trailing spaces removed",
+			name: "spaces in middle of filename preserved",
 			s:    "file .txt",
 			safe: true,
 			want: "file .txt",
