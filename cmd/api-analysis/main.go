@@ -205,12 +205,13 @@ func main() {
 		return
 	}
 
-	_, err = tmpFile.Write(jsonData)
-	if closeErr := tmpFile.Close(); closeErr != nil {
+	_, writeErr := tmpFile.Write(jsonData)
+	closeErr := tmpFile.Close()
+
+	if writeErr != nil {
+		fmt.Printf("Warning: could not save API analysis: %v\n", writeErr)
+	} else if closeErr != nil {
 		fmt.Printf("Warning: failed to close temp file: %v\n", closeErr)
-	}
-	if err != nil {
-		fmt.Printf("Warning: could not save API analysis: %v\n", err)
 	} else {
 		fmt.Printf("\nAPI analysis saved to %s\n", tmpFile.Name())
 	}

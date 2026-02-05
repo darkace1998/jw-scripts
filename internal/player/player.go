@@ -59,8 +59,6 @@ func (m *VideoManager) SetReplay(replay int) {
 	m.replay = replay
 }
 
-const shutdownMessage = "Shutting down gracefully..."
-
 // Run starts the video player loop.
 func (m *VideoManager) Run() error {
 	if err := m.readDump(); err != nil {
@@ -72,6 +70,10 @@ func (m *VideoManager) Run() error {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer func() {
+		signal.Stop(sigChan)
+		close(sigChan)
+	}()
 
 	go func() {
 		<-sigChan
@@ -86,7 +88,6 @@ func (m *VideoManager) Run() error {
 	for {
 		select {
 		case <-m.ctx.Done():
-			fmt.Fprintln(os.Stderr, shutdownMessage)
 			return nil
 		default:
 			if m.setRandomVideo() {
@@ -103,7 +104,6 @@ func (m *VideoManager) Run() error {
 				select {
 				case <-time.After(10 * time.Second):
 				case <-m.ctx.Done():
-					fmt.Fprintln(os.Stderr, shutdownMessage)
 					return nil
 				}
 			}

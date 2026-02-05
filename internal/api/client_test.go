@@ -288,6 +288,60 @@ func TestFormatFilename(t *testing.T) {
 			safe: true,
 			want: "a'b-c.txt",
 		},
+		{
+			name: "Windows reserved name CON",
+			s:    "CON.mp4",
+			safe: true,
+			want: "_CON.mp4",
+		},
+		{
+			name: "Windows reserved name PRN",
+			s:    "PRN.txt",
+			safe: true,
+			want: "_PRN.txt",
+		},
+		{
+			name: "Windows reserved name LPT1",
+			s:    "LPT1.dat",
+			safe: true,
+			want: "_LPT1.dat",
+		},
+		{
+			name: "Windows reserved name lowercase",
+			s:    "con.mp4",
+			safe: true,
+			want: "_con.mp4",
+		},
+		{
+			name: "trailing dots removed",
+			s:    "file..txt",
+			safe: true,
+			want: "file..txt",
+		},
+		{
+			name: "trailing spaces removed",
+			s:    "file .txt",
+			safe: true,
+			want: "file .txt",
+		},
+		{
+			name: "trailing dot and space at end",
+			s:    "file.txt. ",
+			safe: true,
+			want: "file.txt",
+		},
+		{
+			name: "Windows reserved name with trailing space at end",
+			s:    "CON.mp4 ",
+			safe: true,
+			want: "_CON.mp4",
+		},
+		{
+			name: "not safe mode ignores reserved names",
+			s:    "CON.mp4",
+			safe: false,
+			want: "CON.mp4",
+		},
 	}
 
 	for _, tc := range testCases {

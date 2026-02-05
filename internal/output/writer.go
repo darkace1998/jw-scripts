@@ -287,9 +287,20 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	// Validate that the resulting path stays within the work directory to prevent path traversal
 	fullPath := filepath.Join(s.WorkDir, filename)
 	cleanPath := filepath.Clean(fullPath)
-	workDirAbs, _ := filepath.Abs(s.WorkDir)
-	cleanPathAbs, _ := filepath.Abs(cleanPath)
-	if !strings.HasPrefix(cleanPathAbs, workDirAbs) {
+	workDirAbs, err := filepath.Abs(s.WorkDir)
+	if err != nil {
+		return nil, fmt.Errorf("invalid work directory: %w", err)
+	}
+	cleanPathAbs, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid output filename %s: %w", filename, err)
+	}
+	// Use filepath.Rel for cross-platform path validation
+	rel, err := filepath.Rel(workDirAbs, cleanPathAbs)
+	if err != nil {
+		return nil, fmt.Errorf("invalid output filename %s: %w", filename, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return nil, fmt.Errorf("invalid output filename: path traversal detected in %s", filename)
 	}
 	// #nosec G304 - Path is user-configured output file for legitimate file operations
