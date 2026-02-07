@@ -35,4 +35,5 @@ type Settings struct {
 	Mode              string
 	SafeFilenames     bool
 	Sort              string
+	AudioOnly         bool // prefer audio (MP3) files over video (MP4) files
 }

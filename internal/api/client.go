@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,7 +16,9 @@ import (
 )
 
 const (
-	baseURL = "https://data.jw-api.org/mediator/v1"
+	baseURL       = "https://data.jw-api.org/mediator/v1"
+	pubMediaURL   = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
+	latestJWBYear = 134 // jwb-134 is 2026 (increases each year)
 )
 
 // Client is a client for the JW.ORG API.
@@ -133,6 +136,132 @@ func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
 	return &catResp, nil
 }
 
+// GetBroadcastingMP3s fetches JW Broadcasting MP3s from the Publication Media API.
+// It searches through recent JWB publication issues to find available MP3 files.
+func (c *Client) GetBroadcastingMP3s() ([]*Category, error) {
+	var result []*Category
+	usedFilenames := make(map[string]bool)
+
+	cat := &Category{
+		Key:  "JWBroadcasting",
+		Name: "JW Broadcasting (Audio)",
+		Home: true,
+	}
+
+	// Search through recent JWB issues (going back about 3 years)
+	// Each jwb-NNN publication contains monthly programs for that year
+	startIssue := latestJWBYear
+	endIssue := latestJWBYear - 10 // Go back about 10 years worth of issues
+
+	for issue := startIssue; issue >= endIssue; issue-- {
+		pubCode := fmt.Sprintf("jwb-%d", issue)
+
+		if c.settings.Quiet < 1 {
+			fmt.Fprintf(os.Stderr, "indexing: %s\n", pubCode)
+		}
+
+		files, err := c.fetchPubMediaMP3s(pubCode)
+		if err != nil {
+			if c.settings.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "could not fetch %s: %v\n", pubCode, err)
+			}
+			continue
+		}
+
+		for _, f := range files {
+			// Skip audio description versions (track >= 100) unless specifically requested
+			// Also skip items with "audio description" in the title (case-insensitive)
+			titleLower := strings.ToLower(f.Title)
+			if f.Track >= 100 || strings.Contains(titleLower, "audio description") {
+				continue
+			}
+
+			media := &Media{
+				URL:      f.File.URL,
+				Name:     f.Title,
+				MD5:      f.File.Checksum,
+				Size:     f.Filesize,
+				Duration: f.Duration,
+			}
+
+			// Parse date from the modified datetime
+			if f.File.ModifiedDatetime != "" {
+				if date, err := parsePubMediaDate(f.File.ModifiedDatetime); err == nil {
+					if date.Unix() < c.settings.MinDate {
+						continue
+					}
+					if c.settings.MaxDate > 0 && date.Unix() > c.settings.MaxDate {
+						continue
+					}
+					media.Date = date.Unix()
+				}
+			}
+
+			media.Filename = getFilename(media.URL, c.settings.SafeFilenames)
+			media.FriendlyName = getFriendlyFilename(media.Name, media.URL, c.settings.SafeFilenames)
+
+			// Ensure unique filenames
+			if c.settings.FriendlyFilenames {
+				media.Filename = makeUniqueFilename(media.FriendlyName, usedFilenames)
+			} else {
+				media.Filename = makeUniqueFilename(media.Filename, usedFilenames)
+			}
+
+			cat.Contents = append(cat.Contents, media)
+		}
+	}
+
+	if len(cat.Contents) > 0 {
+		result = append(result, cat)
+	}
+
+	return result, nil
+}
+
+// fetchPubMediaMP3s fetches MP3 files for a specific publication from the Publication Media API.
+func (c *Client) fetchPubMediaMP3s(pubCode string) ([]PubMediaFile, error) {
+	params := url.Values{}
+	params.Set("output", "json")
+	params.Set("pub", pubCode)
+	params.Set("langwritten", c.settings.Lang)
+	params.Set("alllangs", "0")
+	params.Set("fileformat", "MP3")
+
+	reqURL := pubMediaURL + "?" + params.Encode()
+	resp, err := c.httpClient.Get(reqURL)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get publication %s: %s", pubCode, resp.Status)
+	}
+
+	var pubResp PubMediaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&pubResp); err != nil {
+		return nil, err
+	}
+
+	// Get MP3 files for the requested language
+	langFiles, ok := pubResp.Files[c.settings.Lang]
+	if !ok {
+		return nil, fmt.Errorf("no files found for language %s", c.settings.Lang)
+	}
+
+	return langFiles.MP3, nil
+}
+
+// parsePubMediaDate parses dates from the Publication Media API format.
+func parsePubMediaDate(dateString string) (time.Time, error) {
+	// Format: "2026-01-18 19:25:59"
+	t, err := time.Parse("2006-01-02 15:04:05", dateString)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t.UTC(), nil
+}
+
 // ParseBroadcasting is the main function to parse the broadcasting data.
 func (c *Client) ParseBroadcasting() ([]*Category, error) {
 	queue := make([]string, len(c.settings.IncludeCategories))
@@ -198,6 +327,15 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 			if m.Type == "audio" {
 				if len(m.Files) > 0 {
 					bestFile = &m.Files[0]
+				}
+			} else if c.settings.AudioOnly {
+				// When audio-only mode is enabled, try to find an audio file
+				bestFile = getBestAudio(m.Files)
+				if bestFile == nil {
+					if c.settings.Quiet < 1 {
+						fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
+					}
+					continue
 				}
 			} else {
 				bestFile = getBestVideo(m.Files, c.settings.Quality, c.settings.HardSubtitles)
@@ -299,6 +437,19 @@ func getBestVideo(files []File, quality int, subtitles bool) *File {
 	}
 
 	return bestFile
+}
+
+// getBestAudio returns the first audio file from a list of files.
+// Returns nil if no audio files are found.
+func getBestAudio(files []File) *File {
+	for i := range files {
+		file := &files[i]
+		// Check if the file is an audio file by examining the mimetype
+		if strings.HasPrefix(file.Mimetype, "audio/") {
+			return file
+		}
+	}
+	return nil
 }
 
 func parseDate(dateString string) (time.Time, error) {

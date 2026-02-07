@@ -33,6 +33,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().BoolVar(&settings.Append, "append", false, "append to file instead of overwriting")
+	rootCmd.Flags().BoolVar(&settings.AudioOnly, "audio-only", false, "download only audio (MP3) files, skip video-only content")
 	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", []string{"VideoOnDemand"}, "comma separated list of categories to index (use --list-categories-all to see available categories)")
 	rootCmd.Flags().BoolVar(&settings.ListCategories, "list-categories-all", false, "list all available root categories")
 	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")

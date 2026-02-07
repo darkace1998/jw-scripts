@@ -33,6 +33,7 @@ type File struct {
 	Label                  string    `json:"label"`
 	Subtitled              bool      `json:"subtitled"`
 	Subtitles              Subtitles `json:"subtitles"`
+	Mimetype               string    `json:"mimetype"`
 }
 
 // Subtitles represents the subtitles for a media file.
@@ -79,4 +80,30 @@ type RootCategoriesResponse struct {
 		Description string   `json:"description"`
 		Tags        []string `json:"tags"`
 	} `json:"categories"`
+}
+
+// PubMediaFile represents a single file from the Publication Media API
+type PubMediaFile struct {
+	Title    string `json:"title"`
+	File     struct {
+		URL              string `json:"url"`
+		ModifiedDatetime string `json:"modifiedDatetime"`
+		Checksum         string `json:"checksum"`
+	} `json:"file"`
+	Filesize   int64   `json:"filesize"`
+	TrackImage struct {
+		URL string `json:"url"`
+	} `json:"trackImage"`
+	Track    int     `json:"track"`
+	Mimetype string  `json:"mimetype"`
+	Duration float64 `json:"duration"`
+}
+
+// PubMediaResponse is the response from the Publication Media API endpoint.
+type PubMediaResponse struct {
+	PubName string `json:"pubName"`
+	Pub     string `json:"pub"`
+	Files   map[string]struct {
+		MP3 []PubMediaFile `json:"MP3"`
+	} `json:"files"`
 }
