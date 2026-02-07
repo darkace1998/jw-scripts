@@ -288,6 +288,60 @@ func TestFormatFilename(t *testing.T) {
 			safe: true,
 			want: "a'b-c.txt",
 		},
+		{
+			name: "Windows reserved name CON",
+			s:    "CON.mp4",
+			safe: true,
+			want: "_CON.mp4",
+		},
+		{
+			name: "Windows reserved name PRN",
+			s:    "PRN.txt",
+			safe: true,
+			want: "_PRN.txt",
+		},
+		{
+			name: "Windows reserved name LPT1",
+			s:    "LPT1.dat",
+			safe: true,
+			want: "_LPT1.dat",
+		},
+		{
+			name: "Windows reserved name lowercase",
+			s:    "con.mp4",
+			safe: true,
+			want: "_con.mp4",
+		},
+		{
+			name: "dots in middle of filename preserved",
+			s:    "file..txt",
+			safe: true,
+			want: "file..txt",
+		},
+		{
+			name: "spaces in middle of filename preserved",
+			s:    "file .txt",
+			safe: true,
+			want: "file .txt",
+		},
+		{
+			name: "trailing dot and space at end",
+			s:    "file.txt. ",
+			safe: true,
+			want: "file.txt",
+		},
+		{
+			name: "Windows reserved name with trailing space at end",
+			s:    "CON.mp4 ",
+			safe: true,
+			want: "_CON.mp4",
+		},
+		{
+			name: "not safe mode ignores reserved names",
+			s:    "CON.mp4",
+			safe: false,
+			want: "CON.mp4",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -308,24 +362,33 @@ func TestParseDate(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "valid date with milliseconds",
+			name:      "valid RFC3339 date with milliseconds",
 			dateStr:   "2021-06-25T10:00:00.123Z",
+			want:      time.Date(2021, 6, 25, 10, 0, 0, 123000000, time.UTC),
+			expectErr: false,
+		},
+		{
+			name:      "valid date without milliseconds",
+			dateStr:   "2021-06-25T10:00:00",
 			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC),
 			expectErr: false,
 		},
 		{
-			name:    "valid date without milliseconds",
-			dateStr: "2021-06-25T10:00:00",
-			// The original function strips the Z, so this will be parsed as local time.
-			// Let's adjust the test to handle this.
-			// No, the original function's regex only strips `.123Z`. It doesn't handle a missing `Z`.
-			// Let's re-read the function.
-			// `re := regexp.MustCompile(`\.[0-9]+Z$`)`
-			// `dateString = re.ReplaceAllString(dateString, "")`
-			// `return time.Parse("2006-01-02T15:04:05", dateString)`
-			// If the input is "2021-06-25T10:00:00", the regex doesn't match, and it's passed to time.Parse.
-			// time.Parse without a zone will assume UTC. So my original assumption was correct.
+			name:      "valid RFC3339 date without milliseconds",
+			dateStr:   "2021-06-25T10:00:00Z",
 			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC),
+			expectErr: false,
+		},
+		{
+			name:      "valid RFC3339 date with positive timezone offset",
+			dateStr:   "2021-06-25T12:00:00+02:00",
+			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC), // 12:00 +02:00 = 10:00 UTC
+			expectErr: false,
+		},
+		{
+			name:      "valid RFC3339 date with negative timezone offset",
+			dateStr:   "2021-06-25T05:00:00-05:00",
+			want:      time.Date(2021, 6, 25, 10, 0, 0, 0, time.UTC), // 05:00 -05:00 = 10:00 UTC
 			expectErr: false,
 		},
 		{

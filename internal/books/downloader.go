@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
 	"github.com/darkace1998/jw-scripts/internal/downloader"
@@ -16,18 +15,13 @@ import (
 
 // Downloader implements the BookDownloader interface
 type Downloader struct {
-	settings        *config.Settings
-	progressMutex   sync.Mutex
-	downloadedBytes int64
-	totalBytes      int64
+	settings *config.Settings
 }
 
 // NewDownloader creates a new book downloader
 func NewDownloader(s *config.Settings) *Downloader {
 	return &Downloader{
-		settings:        s,
-		downloadedBytes: 0,
-		totalBytes:      0,
+		settings: s,
 	}
 }
 
@@ -172,27 +166,4 @@ func (d *Downloader) getFileExtension(format BookFormat) string {
 	default:
 		return string(format)
 	}
-}
-
-// GetDownloadProgress returns download progress information
-func (d *Downloader) GetDownloadProgress() (downloaded, total int64) {
-	d.progressMutex.Lock()
-	defer d.progressMutex.Unlock()
-	return d.downloadedBytes, d.totalBytes
-}
-
-// SetDownloadProgress updates the download progress information
-func (d *Downloader) SetDownloadProgress(downloaded, total int64) {
-	d.progressMutex.Lock()
-	defer d.progressMutex.Unlock()
-	d.downloadedBytes = downloaded
-	d.totalBytes = total
-}
-
-// ResetDownloadProgress resets the download progress to zero
-func (d *Downloader) ResetDownloadProgress() {
-	d.progressMutex.Lock()
-	defer d.progressMutex.Unlock()
-	d.downloadedBytes = 0
-	d.totalBytes = 0
 }

@@ -102,6 +102,11 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 			continue
 		}
 
+		// Skip categories with empty keys to avoid invalid filenames
+		if category.Key == "" {
+			continue
+		}
+
 		sortMedia(categoryMedia, s.Sort)
 
 		// Create separate output file for each category
@@ -279,8 +284,27 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("output filename is required for txt mode")
 	}
+	// Validate that the resulting path stays within the work directory to prevent path traversal
+	fullPath := filepath.Join(s.WorkDir, filename)
+	cleanPath := filepath.Clean(fullPath)
+	workDirAbs, err := filepath.Abs(s.WorkDir)
+	if err != nil {
+		return nil, fmt.Errorf("invalid work directory: %w", err)
+	}
+	cleanPathAbs, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid output filename %s: %w", filename, err)
+	}
+	// Use filepath.Rel for cross-platform path validation
+	rel, err := filepath.Rel(workDirAbs, cleanPathAbs)
+	if err != nil {
+		return nil, fmt.Errorf("invalid output filename %s: %w", filename, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return nil, fmt.Errorf("invalid output filename: path traversal detected in %s", filename)
+	}
 	// #nosec G304 - Path is user-configured output file for legitimate file operations
-	file, err := os.Create(filepath.Join(s.WorkDir, filename))
+	file, err := os.Create(cleanPath)
 	if err != nil {
 		return nil, err
 	}

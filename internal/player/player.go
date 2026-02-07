@@ -2,13 +2,16 @@
 package player
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
@@ -26,16 +29,21 @@ type VideoManager struct {
 	pos       int
 	startTime time.Time
 	errors    int
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // NewVideoManager creates a new VideoManager.
 func NewVideoManager(s *config.Settings) *VideoManager {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &VideoManager{
 		wd:       s.WorkDir,
 		replay:   30, // default replay time
 		cmd:      []string{"omxplayer", "--pos", "{}", "--no-osd"},
 		verbose:  s.Quiet < 1,
 		dumpFile: filepath.Join(s.WorkDir, "dump.json"),
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 }
 
@@ -59,21 +67,53 @@ func (m *VideoManager) Run() error {
 		}
 	}
 
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer func() {
+		signal.Stop(sigChan)
+		close(sigChan)
+	}()
+
+	go func() {
+		<-sigChan
+		fmt.Fprintln(os.Stderr, "\nReceived shutdown signal, saving state...")
+		if err := m.writeDump(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to save state: %v\n", err)
+		}
+		m.cancel()
+	}()
+
 	showMsg := true
 	for {
-		if m.setRandomVideo() {
-			if err := m.playVideo(); err != nil {
-				return err
+		select {
+		case <-m.ctx.Done():
+			return nil
+		default:
+			if m.setRandomVideo() {
+				if err := m.playVideo(); err != nil {
+					return err
+				}
+				showMsg = true
+			} else {
+				if showMsg {
+					fmt.Fprintln(os.Stderr, "no videos to play yet")
+					showMsg = false
+				}
+				// Use a timer with context to allow cancellation during sleep
+				select {
+				case <-time.After(10 * time.Second):
+				case <-m.ctx.Done():
+					return nil
+				}
 			}
-			showMsg = true
-		} else {
-			if showMsg {
-				fmt.Fprintln(os.Stderr, "no videos to play yet")
-				showMsg = false
-			}
-			time.Sleep(10 * time.Second)
 		}
 	}
+}
+
+// Stop gracefully stops the video manager
+func (m *VideoManager) Stop() {
+	m.cancel()
 }
 
 func (m *VideoManager) readDump() error {

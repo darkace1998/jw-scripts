@@ -124,24 +124,9 @@ func TestDownloader(t *testing.T) {
 		t.Fatal("NewDownloader returned nil")
 	}
 
-	// Test download progress
-	downloaded, total := downloader.GetDownloadProgress()
-	if downloaded != 0 || total != 0 {
-		t.Errorf("Expected progress to be 0,0 but got %d,%d", downloaded, total)
-	}
-
-	// Test progress tracking
-	downloader.SetDownloadProgress(500, 1000)
-	downloaded, total = downloader.GetDownloadProgress()
-	if downloaded != 500 || total != 1000 {
-		t.Errorf("Expected progress to be 500,1000 but got %d,%d", downloaded, total)
-	}
-
-	// Test progress reset
-	downloader.ResetDownloadProgress()
-	downloaded, total = downloader.GetDownloadProgress()
-	if downloaded != 0 || total != 0 {
-		t.Errorf("Expected progress to be 0,0 after reset but got %d,%d", downloaded, total)
+	// Basic downloader initialization test
+	if downloader.settings != settings {
+		t.Error("Expected settings to be set correctly")
 	}
 }
 
