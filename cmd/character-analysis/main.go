@@ -190,11 +190,12 @@ func main() {
 	_, writeErr := tmpFile.Write(jsonData)
 	closeErr := tmpFile.Close()
 
-	if writeErr != nil {
+	switch {
+	case writeErr != nil:
 		fmt.Printf("Warning: could not save analysis data: %v\n", writeErr)
-	} else if closeErr != nil {
+	case closeErr != nil:
 		fmt.Printf("Warning: could not close temp file: %v\n", closeErr)
-	} else {
+	default:
 		fmt.Printf("\nAnalysis data saved to %s\n", tmpFile.Name())
 	}
 }

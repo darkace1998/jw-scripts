@@ -41,8 +41,8 @@ func NewClient(s *config.Settings) *Client {
 
 // GetLanguages fetches the list of available languages.
 func (c *Client) GetLanguages() ([]Language, error) {
-	url := fmt.Sprintf("%s/languages/E/web?clientType=www", c.baseURL)
-	resp, err := c.httpClient.Get(url)
+	reqURL := fmt.Sprintf("%s/languages/E/web?clientType=www", c.baseURL)
+	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +62,8 @@ func (c *Client) GetLanguages() ([]Language, error) {
 
 // GetRootCategories fetches all available root categories from the API.
 func (c *Client) GetRootCategories() ([]string, error) {
-	url := fmt.Sprintf("%s/categories/%s/?detailed=1", c.baseURL, c.settings.Lang)
-	resp, err := c.httpClient.Get(url)
+	reqURL := fmt.Sprintf("%s/categories/%s/?detailed=1", c.baseURL, c.settings.Lang)
+	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +117,8 @@ func (c *Client) GetRootCategories() ([]string, error) {
 
 // GetCategory fetches a category by its key.
 func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
-	url := fmt.Sprintf("%s/categories/%s/%s?detailed=1", c.baseURL, lang, key)
-	resp, err := c.httpClient.Get(url)
+	reqURL := fmt.Sprintf("%s/categories/%s/%s?detailed=1", c.baseURL, lang, key)
+	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -324,20 +324,21 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 
 			var bestFile *File
 
-			if m.Type == "audio" {
-				if len(m.Files) > 0 {
-					bestFile = &m.Files[0]
+switch {
+		case m.Type == "audio":
+			if len(m.Files) > 0 {
+				bestFile = &m.Files[0]
+			}
+		case c.settings.AudioOnly:
+			// When audio-only mode is enabled, try to find an audio file
+			bestFile = getBestAudio(m.Files)
+			if bestFile == nil {
+				if c.settings.Quiet < 1 {
+					fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
 				}
-			} else if c.settings.AudioOnly {
-				// When audio-only mode is enabled, try to find an audio file
-				bestFile = getBestAudio(m.Files)
-				if bestFile == nil {
-					if c.settings.Quiet < 1 {
-						fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
-					}
-					continue
-				}
-			} else {
+				continue
+			}
+		default:
 				bestFile = getBestVideo(m.Files, c.settings.Quality, c.settings.HardSubtitles)
 			}
 
@@ -514,18 +515,18 @@ func formatFilename(s string, safe bool) string {
 	return result
 }
 
-func getFilename(url string, safe bool) string {
-	if url == "" {
+func getFilename(fileURL string, safe bool) string {
+	if fileURL == "" {
 		return ""
 	}
-	return formatFilename(filepath.Base(url), safe)
+	return formatFilename(filepath.Base(fileURL), safe)
 }
 
-func getSubtitleFilename(url string, safe bool) string {
-	if url == "" {
+func getSubtitleFilename(fileURL string, safe bool) string {
+	if fileURL == "" {
 		return ""
 	}
-	filename := filepath.Base(url)
+	filename := filepath.Base(fileURL)
 	ext := filepath.Ext(filename)
 	// Only use the extension if it's a valid subtitle extension (.vtt)
 	// Otherwise, add .vtt for subtitle files
@@ -535,11 +536,11 @@ func getSubtitleFilename(url string, safe bool) string {
 	return formatFilename(filename, safe)
 }
 
-func getFriendlyFilename(name, url string, safe bool) string {
-	if url == "" {
+func getFriendlyFilename(name, fileURL string, safe bool) string {
+	if fileURL == "" {
 		return ""
 	}
-	return formatFilename(name+filepath.Ext(url), safe)
+	return formatFilename(name+filepath.Ext(fileURL), safe)
 }
 
 func getFriendlySubtitleFilename(name, subtitleURL string, safe bool) string {

@@ -142,7 +142,6 @@ func run(s *config.Settings) error {
 
 	// Check if JWBroadcasting is requested
 	var data []*api.Category
-	var err error
 
 	hasJWBroadcasting := false
 	var otherCategories []string
@@ -174,13 +173,13 @@ func run(s *config.Settings) error {
 	}
 
 	if s.Download {
-		if err = downloader.DownloadAll(s, data); err != nil {
+		if err := downloader.DownloadAll(s, data); err != nil {
 			return err
 		}
 	}
 
 	if s.Mode != "" {
-		if err = output.CreateOutput(s, data); err != nil {
+		if err := output.CreateOutput(s, data); err != nil {
 			return err
 		}
 	}
