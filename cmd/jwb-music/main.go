@@ -51,6 +51,7 @@ By default, it downloads all available music files. Use flags to customize the b
 
 func init() {
 	rootCmd.Flags().BoolVar(&settings.Append, "append", false, "append to file instead of overwriting")
+	rootCmd.Flags().BoolVar(&settings.AudioOnly, "audio-only", true, "download only audio (MP3) files, skip video-only content (enabled by default)")
 	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", musicCategories, "comma separated list of music categories to include")
 	rootCmd.Flags().BoolVar(&settings.ListCategories, "list-categories", false, "list all available music categories")
 	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")

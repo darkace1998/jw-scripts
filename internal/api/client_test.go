@@ -479,3 +479,59 @@ func TestMakeUniqueFilename(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBestAudio(t *testing.T) {
+	testCases := []struct {
+		name  string
+		files []File
+		want  *File
+	}{
+		{
+			name: "select audio file from mixed list",
+			files: []File{
+				{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Mimetype: "video/mp4"},
+				{ProgressiveDownloadURL: "song.mp3", Label: "", Mimetype: "audio/mpeg"},
+				{ProgressiveDownloadURL: "480p.mp4", Label: "480p", Mimetype: "video/mp4"},
+			},
+			want: &File{ProgressiveDownloadURL: "song.mp3", Label: "", Mimetype: "audio/mpeg"},
+		},
+		{
+			name: "no audio files available",
+			files: []File{
+				{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Mimetype: "video/mp4"},
+				{ProgressiveDownloadURL: "480p.mp4", Label: "480p", Mimetype: "video/mp4"},
+			},
+			want: nil,
+		},
+		{
+			name: "only audio file",
+			files: []File{
+				{ProgressiveDownloadURL: "song.mp3", Label: "", Mimetype: "audio/mpeg"},
+			},
+			want: &File{ProgressiveDownloadURL: "song.mp3", Label: "", Mimetype: "audio/mpeg"},
+		},
+		{
+			name:  "empty file list",
+			files: []File{},
+			want:  nil,
+		},
+		{
+			name: "audio/aac mimetype",
+			files: []File{
+				{ProgressiveDownloadURL: "720p.mp4", Label: "720p", Mimetype: "video/mp4"},
+				{ProgressiveDownloadURL: "song.aac", Label: "", Mimetype: "audio/aac"},
+			},
+			want: &File{ProgressiveDownloadURL: "song.aac", Label: "", Mimetype: "audio/aac"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := getBestAudio(tc.files)
+
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("getBestAudio() got = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

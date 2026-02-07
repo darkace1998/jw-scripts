@@ -199,6 +199,15 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 				if len(m.Files) > 0 {
 					bestFile = &m.Files[0]
 				}
+			} else if c.settings.AudioOnly {
+				// When audio-only mode is enabled, try to find an audio file
+				bestFile = getBestAudio(m.Files)
+				if bestFile == nil {
+					if c.settings.Quiet < 1 {
+						fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
+					}
+					continue
+				}
 			} else {
 				bestFile = getBestVideo(m.Files, c.settings.Quality, c.settings.HardSubtitles)
 			}
@@ -299,6 +308,19 @@ func getBestVideo(files []File, quality int, subtitles bool) *File {
 	}
 
 	return bestFile
+}
+
+// getBestAudio returns the best audio file from a list of files.
+// Returns nil if no audio files are found.
+func getBestAudio(files []File) *File {
+	for i := range files {
+		file := &files[i]
+		// Check if the file is an audio file by examining the mimetype
+		if strings.HasPrefix(file.Mimetype, "audio/") {
+			return file
+		}
+	}
+	return nil
 }
 
 func parseDate(dateString string) (time.Time, error) {

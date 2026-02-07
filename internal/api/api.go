@@ -33,6 +33,7 @@ type File struct {
 	Label                  string    `json:"label"`
 	Subtitled              bool      `json:"subtitled"`
 	Subtitles              Subtitles `json:"subtitles"`
+	Mimetype               string    `json:"mimetype"`
 }
 
 // Subtitles represents the subtitles for a media file.
