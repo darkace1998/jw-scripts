@@ -26,16 +26,22 @@ var musicCategories = []string{
 	"KingdomMelodies",
 }
 
+// JWBroadcastingCategory is the special category for JW Broadcasting MP3s
+const JWBroadcastingCategory = "JWBroadcasting"
+
 var rootCmd = &cobra.Command{
 	Use:   "jwb-music",
-	Short: "Download all music files from jw.org",
-	Long: `jwb-music is a specialized tool for downloading all music files from jw.org.
+	Short: "Download all music and audio files from jw.org",
+	Long: `jwb-music is a specialized tool for downloading all music and audio files from jw.org.
 
 It downloads from all music-related categories including:
 - Original Songs
 - "Sing Out Joyfully" (Meetings, Vocals, Instrumental)
 - Children's Songs
 - Kingdom Melodies
+
+You can also download JW Broadcasting monthly programs as MP3 using:
+  jwb-music -c JWBroadcasting
 
 By default, it downloads all available music files. Use flags to customize the behavior.`,
 	Run: func(_ *cobra.Command, args []string) {
@@ -109,6 +115,8 @@ func run(s *config.Settings) error {
 				fmt.Printf("  %s (%s)\n", catResp.Category.Name, cat)
 			}
 		}
+		// Also show the JW Broadcasting option
+		fmt.Printf("  JW Broadcasting - Audio (%s)\n", JWBroadcastingCategory)
 		return nil
 	}
 
@@ -132,19 +140,47 @@ func run(s *config.Settings) error {
 
 	// TODO: Implement offline import
 
-	data, err := client.ParseBroadcasting()
-	if err != nil {
-		return err
+	// Check if JWBroadcasting is requested
+	var data []*api.Category
+	var err error
+
+	hasJWBroadcasting := false
+	var otherCategories []string
+	for _, cat := range s.IncludeCategories {
+		if cat == JWBroadcastingCategory {
+			hasJWBroadcasting = true
+		} else {
+			otherCategories = append(otherCategories, cat)
+		}
+	}
+
+	// Fetch JW Broadcasting MP3s if requested
+	if hasJWBroadcasting {
+		jwbData, err := client.GetBroadcastingMP3s()
+		if err != nil {
+			return fmt.Errorf("failed to fetch JW Broadcasting: %v", err)
+		}
+		data = append(data, jwbData...)
+	}
+
+	// Fetch other categories using the standard API
+	if len(otherCategories) > 0 {
+		s.IncludeCategories = otherCategories
+		otherData, err := client.ParseBroadcasting()
+		if err != nil {
+			return err
+		}
+		data = append(data, otherData...)
 	}
 
 	if s.Download {
-		if err := downloader.DownloadAll(s, data); err != nil {
+		if err = downloader.DownloadAll(s, data); err != nil {
 			return err
 		}
 	}
 
 	if s.Mode != "" {
-		if err := output.CreateOutput(s, data); err != nil {
+		if err = output.CreateOutput(s, data); err != nil {
 			return err
 		}
 	}

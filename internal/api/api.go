@@ -81,3 +81,29 @@ type RootCategoriesResponse struct {
 		Tags        []string `json:"tags"`
 	} `json:"categories"`
 }
+
+// PubMediaFile represents a single file from the Publication Media API
+type PubMediaFile struct {
+	Title    string `json:"title"`
+	File     struct {
+		URL              string `json:"url"`
+		ModifiedDatetime string `json:"modifiedDatetime"`
+		Checksum         string `json:"checksum"`
+	} `json:"file"`
+	Filesize   int64   `json:"filesize"`
+	TrackImage struct {
+		URL string `json:"url"`
+	} `json:"trackImage"`
+	Track    int     `json:"track"`
+	Mimetype string  `json:"mimetype"`
+	Duration float64 `json:"duration"`
+}
+
+// PubMediaResponse is the response from the Publication Media API endpoint.
+type PubMediaResponse struct {
+	PubName string `json:"pubName"`
+	Pub     string `json:"pub"`
+	Files   map[string]struct {
+		MP3 []PubMediaFile `json:"MP3"`
+	} `json:"files"`
+}
