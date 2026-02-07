@@ -310,7 +310,7 @@ func getBestVideo(files []File, quality int, subtitles bool) *File {
 	return bestFile
 }
 
-// getBestAudio returns the best audio file from a list of files.
+// getBestAudio returns the first audio file from a list of files.
 // Returns nil if no audio files are found.
 func getBestAudio(files []File) *File {
 	for i := range files {
