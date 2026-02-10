@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/util"
 )
 
 const (
@@ -21,6 +22,14 @@ const (
 	// jwbYearBase is subtracted from the current year to derive the JWB issue number.
 	// For example, 2026 - 1892 = 134 (i.e. jwb-134).
 	jwbYearBase = 1892
+
+	// qualityMatchBonus is the ranking bonus applied when a video resolution
+	// is within the requested quality limit.
+	qualityMatchBonus = 200
+
+	// subtitleMatchBonus is the ranking bonus applied when a video's subtitle
+	// state matches the requested preference.
+	subtitleMatchBonus = 100
 )
 
 // Client is a client for the JW.ORG API.
@@ -302,7 +311,7 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 		cat := &Category{
 			Key:  catResp.Category.Key,
 			Name: catResp.Category.Name,
-			Home: contains(c.settings.IncludeCategories, catResp.Category.Key),
+			Home: util.Contains(c.settings.IncludeCategories, catResp.Category.Key),
 		}
 		if !c.settings.Update {
 			result = append(result, cat)
@@ -314,13 +323,13 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 				Name: sub.Name,
 			}
 			cat.Contents = append(cat.Contents, subCat)
-			if !contains(c.settings.ExcludeCategories, sub.Key) {
+			if !util.Contains(c.settings.ExcludeCategories, sub.Key) {
 				queue = append(queue, sub.Key)
 			}
 		}
 
 		for _, m := range catResp.Category.Media {
-			if contains(c.settings.FilterCategories, m.PrimaryCategory) {
+			if util.Contains(c.settings.FilterCategories, m.PrimaryCategory) {
 				continue
 			}
 
@@ -424,13 +433,17 @@ func getBestVideo(files []File, quality int, subtitles bool) *File {
 	for i := range files {
 		file := &files[i]
 		rank := 0
-		res, _ := strconv.Atoi(strings.TrimSuffix(file.Label, "p"))
+		res, err := strconv.Atoi(strings.TrimSuffix(file.Label, "p"))
+		if err != nil {
+			// Non-numeric label; treat resolution as 0 (lowest priority)
+			res = 0
+		}
 		rank += res / 10
 		if res > 0 && res <= quality {
-			rank += 200
+			rank += qualityMatchBonus
 		}
 		if file.Subtitled == subtitles {
-			rank += 100
+			rank += subtitleMatchBonus
 		}
 
 		if rank > maxRank {
@@ -579,11 +592,3 @@ func makeUniqueFilename(filename string, usedFilenames map[string]bool) string {
 	return filename
 }
 
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}

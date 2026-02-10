@@ -310,7 +310,8 @@ func (c *Client) getPublicationDataForLanguage(pubCode, issue, lang string) (*Pu
 		return nil, fmt.Errorf("API returned status %d for publication '%s'", resp.StatusCode, pubCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// Limit response body to 10 MiB to prevent excessive memory use
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}

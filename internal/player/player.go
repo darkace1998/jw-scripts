@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/util"
 )
 
 // VideoManager manages the video playback.
@@ -170,7 +171,7 @@ func (m *VideoManager) setRandomVideo() bool {
 	rand.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
 
 	for _, vid := range files {
-		if !contains(m.history, vid) {
+		if !util.Contains(m.history, vid) {
 			m.video = vid
 			m.pos = 0
 			return true
@@ -256,13 +257,4 @@ func (m *VideoManager) listVideos() ([]string, error) {
 		}
 	}
 	return videos, nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

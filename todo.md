@@ -28,22 +28,22 @@ A prioritized list of improvements, fixes, and enhancements for the jw-scripts p
 
 ### Error Handling
 
-- [ ] Add response body size limit when reading API responses in `internal/books/client.go` (`io.ReadAll` with no size cap)
-- [ ] Return errors from symlink creation in `internal/output/writer.go` instead of only logging them
-- [ ] Handle `strconv.Atoi` errors when parsing resolution in `internal/api/client.go` instead of silently ignoring them
-- [ ] Guard unchecked type assertions (e.g., `item.(*api.Media)`) to prevent potential panics
+- [x] Add response body size limit when reading API responses in `internal/books/client.go` (`io.ReadAll` with no size cap)
+- [x] Return errors from symlink creation in `internal/output/writer.go` instead of only logging them
+- [x] Handle `strconv.Atoi` errors when parsing resolution in `internal/api/client.go` instead of silently ignoring them
+- [x] Guard unchecked type assertions (e.g., `item.(*api.Media)`) to prevent potential panics — already uses comma-ok pattern everywhere
 
 ### Code Quality
 
-- [ ] Extract duplicated `contains()` helper (defined in both `internal/api/client.go` and `internal/player/player.go`) into a shared utility
-- [ ] Unify error handling patterns across the codebase — currently a mix of `fmt.Errorf`, log-and-continue, and silent drops
-- [ ] Add a comment or constant for magic numbers: `200` (ranking bonus), `100` (subtitle bonus) in `internal/api/client.go`
+- [x] Extract duplicated `contains()` helper (defined in both `internal/api/client.go` and `internal/player/player.go`) into `internal/util`
+- [x] Unify error handling patterns across the codebase — symlink errors now returned, strconv errors handled, consistent `fmt.Errorf` with `%w` wrapping
+- [x] Add a comment or constant for magic numbers: `qualityMatchBonus` (200) and `subtitleMatchBonus` (100) in `internal/api/client.go`
 
 ### Testing
 
-- [ ] Add tests for `internal/player` — currently the only internal package with zero test coverage
-- [ ] Add integration tests or CLI smoke tests for `cmd/jwb-index`, `cmd/jwb-music`, `cmd/jwb-books`, and `cmd/jwb-offline`
-- [ ] Add benchmark tests for the downloader and API client to track performance
+- [x] Add tests for `internal/player` — 16 test functions covering all exported and key internal functions
+- [x] Add integration tests or CLI smoke tests for `cmd/jwb-index`, `cmd/jwb-music`, `cmd/jwb-books`, and `cmd/jwb-offline`
+- [x] Add benchmark tests for the downloader and API client to track performance
 
 ---
 
