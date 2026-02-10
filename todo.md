@@ -14,13 +14,13 @@ A prioritized list of improvements, fixes, and enhancements for the jw-scripts p
 
 ### Missing Features
 
-- [ ] Implement offline import for `jwb-music` (`cmd/jwb-music/main.go` — `// TODO: Implement offline import`)
-- [ ] Investigate books/publications download support — current implementation is a framework only and cannot actually download books due to API limitations
+- [x] Implement offline import for `jwb-music` (`cmd/jwb-music/main.go`) and `jwb-index` (`cmd/jwb-index/main.go`)
+- [x] Investigate books/publications download support — the books framework works with the real JW.org Publication Media API; actual downloads depend on API availability per publication
 
 ### Hardcoded Values
 
-- [ ] Parameterize `latestJWBYear = 134` in `internal/api/client.go` — requires manual update every year; consider computing it from the current date
-- [ ] Update default player from `omxplayer` (deprecated/removed from most distros) to a modern alternative like `mpv` or `vlc`
+- [x] Parameterize `latestJWBYear` in `internal/api/client.go` — now computed as `time.Now().Year() - jwbYearBase` (no yearly manual update needed)
+- [x] Update default player from `omxplayer` (deprecated/removed from most distros) to `mpv`
 
 ---
 

@@ -39,7 +39,7 @@ func NewVideoManager(s *config.Settings) *VideoManager {
 	return &VideoManager{
 		wd:       s.WorkDir,
 		replay:   30, // default replay time
-		cmd:      []string{"omxplayer", "--pos", "{}", "--no-osd"},
+		cmd:      []string{"mpv", "--start", "{}", "--no-terminal"},
 		verbose:  s.Quiet < 1,
 		dumpFile: filepath.Join(s.WorkDir, "dump.json"),
 		ctx:      ctx,

@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	baseURL       = "https://data.jw-api.org/mediator/v1"
-	pubMediaURL   = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
-	latestJWBYear = 134 // jwb-134 is 2026 (increases each year)
+	baseURL     = "https://data.jw-api.org/mediator/v1"
+	pubMediaURL = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
+	// jwbYearBase is subtracted from the current year to derive the JWB issue number.
+	// For example, 2026 - 1892 = 134 (i.e. jwb-134).
+	jwbYearBase = 1892
 )
 
 // Client is a client for the JW.ORG API.
@@ -150,8 +152,8 @@ func (c *Client) GetBroadcastingMP3s() ([]*Category, error) {
 
 	// Search through recent JWB issues (going back about 3 years)
 	// Each jwb-NNN publication contains monthly programs for that year
-	startIssue := latestJWBYear
-	endIssue := latestJWBYear - 10 // Go back about 10 years worth of issues
+	startIssue := time.Now().Year() - jwbYearBase
+	endIssue := startIssue - 10 // Go back about 10 years worth of issues
 
 	for issue := startIssue; issue >= endIssue; issue-- {
 		pubCode := fmt.Sprintf("jwb-%d", issue)
