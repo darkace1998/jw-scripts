@@ -8,9 +8,9 @@ A prioritized list of improvements, fixes, and enhancements for the jw-scripts p
 
 ### Bugs
 
-- [ ] Fix overly permissive API health check in `internal/books/client.go` — returns true for 2xx–4xx status codes (including client errors); should only accept 2xx
-- [ ] Use `http.StatusOK` instead of hardcoded `200` in `internal/books/client.go` for consistency with the rest of the codebase
-- [ ] Handle ignored error from `listVideos()` in `internal/player/player.go` — error is silently discarded
+- [x] Fix overly permissive API health check in `internal/books/client.go` — returns true for 2xx–4xx status codes (including client errors); should only accept 2xx
+- [x] Use `http.StatusOK` instead of hardcoded `200` in `internal/books/client.go` for consistency with the rest of the codebase
+- [x] Handle ignored error from `listVideos()` in `internal/player/player.go` — error is silently discarded
 
 ### Missing Features
 

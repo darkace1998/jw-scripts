@@ -237,10 +237,16 @@ func (c *Client) GetSupportedFormats() []BookFormat {
 
 // IsBookAPIAvailable checks if the book API is currently available
 func (c *Client) IsBookAPIAvailable() bool {
-	// Test with a simple request to see if the API endpoint is reachable
-	// We'll use the base domain rather than the full API URL for the health check
-	baseURL := "https://b.jw-cdn.org"
-	req, err := http.NewRequest("GET", baseURL, http.NoBody)
+	// Test with a known publication to verify the API endpoint is reachable
+	params := url.Values{}
+	params.Set("output", "json")
+	params.Set("pub", "nwtsty")
+	params.Set("fileformat", "PDF")
+	params.Set("alllangs", "0")
+	params.Set("langwritten", "E")
+	requestURL := c.baseURL + "?" + params.Encode()
+
+	req, err := http.NewRequest("GET", requestURL, http.NoBody)
 	if err != nil {
 		return false
 	}
@@ -249,9 +255,7 @@ func (c *Client) IsBookAPIAvailable() bool {
 		return false
 	}
 	defer func() { _ = resp.Body.Close() }()
-	// The CDN should respond even with a simple GET to the root
-	// Consider 2xx, 3xx, and 4xx status codes as available (CDN is responding)
-	return resp.StatusCode >= 200 && resp.StatusCode < 500
+	return resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices
 }
 
 // GetAPILimitations returns information about current API status
@@ -302,7 +306,7 @@ func (c *Client) getPublicationDataForLanguage(pubCode, issue, lang string) (*Pu
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d for publication '%s'", resp.StatusCode, pubCode)
 	}
 

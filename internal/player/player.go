@@ -231,9 +231,13 @@ func (m *VideoManager) playVideo() error {
 }
 
 func (m *VideoManager) addToHistory(video string) {
-	files, _ := m.listVideos()
-	maxLen := len(files) / 2
 	m.history = append(m.history, video)
+	files, err := m.listVideos()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not list videos: %v\n", err)
+		return
+	}
+	maxLen := len(files) / 2
 	if len(m.history) > maxLen {
 		m.history = m.history[len(m.history)-maxLen:]
 	}
