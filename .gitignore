@@ -1,6 +1,6 @@
 /bin/
 /jwb*/
-jwb-index
+/jwb-index
 /dist/
 coverage.out
 *.log
@@ -8,6 +8,6 @@ coverage.out
 *.mp4
 *.mp3
 /music/
-jwb-books
-media-analysis
-api-analysis
+/jwb-books
+/media-analysis
+/api-analysis
