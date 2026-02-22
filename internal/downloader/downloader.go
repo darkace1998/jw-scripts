@@ -253,6 +253,7 @@ func DownloadFile(rawURL, path string, resume bool, rateLimit float64) error {
 		}
 	}
 
+	// #nosec G704 - URL scheme is validated above to only allow http/https; this is a legitimate file download
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

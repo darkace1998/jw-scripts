@@ -258,6 +258,7 @@ func (c *Client) IsBookAPIAvailable() bool {
 	if err != nil {
 		return false
 	}
+	// #nosec G704 - URL scheme is validated above to only allow http/https; base URL is a fixed JW.org endpoint
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return false
