@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().IntVar(&replaySec, "replay-sec", 30, "seconds to replay after a restart")
-	rootCmd.Flags().StringSliceVar(&playerCmd, "cmd", []string{"omxplayer", "--pos", "{}", "--no-osd"}, "video player command")
+	rootCmd.Flags().StringSliceVar(&playerCmd, "cmd", []string{"mpv", "--start", "{}", "--no-terminal"}, "video player command")
 	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
 }
 

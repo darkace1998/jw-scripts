@@ -197,9 +197,8 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 			if err != nil {
 				return err
 			}
-			if err := os.Symlink(targetPath, linkPath); err != nil {
-				// Log symlink error but continue - it's not critical
-				fmt.Fprintf(os.Stderr, "Warning: Failed to create symlink %s -> %s: %v\n", linkPath, targetPath, err)
+			if err := os.Symlink(targetPath, linkPath); err != nil && !os.IsExist(err) {
+				return fmt.Errorf("failed to create symlink %s -> %s: %w", linkPath, targetPath, err)
 			}
 		}
 
@@ -215,9 +214,8 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 				if err != nil {
 					return err
 				}
-				if err := os.Symlink(targetPath, linkFile); err != nil {
-					// Log symlink error but continue - it's not critical
-					fmt.Fprintf(os.Stderr, "Warning: Failed to create symlink %s -> %s: %v\n", linkFile, targetPath, err)
+				if err := os.Symlink(targetPath, linkFile); err != nil && !os.IsExist(err) {
+					return fmt.Errorf("failed to create symlink %s -> %s: %w", linkFile, targetPath, err)
 				}
 			case *api.Media:
 				linkDest := filepath.Join(dataDir, v.Filename)
@@ -229,9 +227,8 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 				if err != nil {
 					return err
 				}
-				if err := os.Symlink(targetPath, linkFile); err != nil {
-					// Log symlink error but continue - it's not critical
-					fmt.Fprintf(os.Stderr, "Warning: Failed to create symlink %s -> %s: %v\n", linkFile, targetPath, err)
+				if err := os.Symlink(targetPath, linkFile); err != nil && !os.IsExist(err) {
+					return fmt.Errorf("failed to create symlink %s -> %s: %w", linkFile, targetPath, err)
 				}
 			}
 		}

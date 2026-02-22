@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -138,8 +139,6 @@ func run(s *config.Settings) error {
 		s.SubDir = "jwb-music-" + s.Lang
 	}
 
-	// TODO: Implement offline import
-
 	// Check if JWBroadcasting is requested
 	var data []*api.Category
 
@@ -172,6 +171,15 @@ func run(s *config.Settings) error {
 		data = append(data, otherData...)
 	}
 
+	// Offline import: scan the import directory for media files and add them to the data
+	if s.ImportDir != "" {
+		importedData, err := importOfflineMedia(s)
+		if err != nil {
+			return fmt.Errorf("offline import failed: %v", err)
+		}
+		data = append(data, importedData...)
+	}
+
 	if s.Download {
 		if err := downloader.DownloadAll(s, data); err != nil {
 			return err
@@ -185,4 +193,72 @@ func run(s *config.Settings) error {
 	}
 
 	return nil
+}
+
+// importOfflineMedia scans the import directory for media files and returns
+// them as categories that can be processed by the output/download pipeline.
+func importOfflineMedia(s *config.Settings) ([]*api.Category, error) {
+	entries, err := os.ReadDir(s.ImportDir)
+	if err != nil {
+		return nil, fmt.Errorf("could not read import directory: %w", err)
+	}
+
+	cat := &api.Category{
+		Key:  "imported",
+		Name: "Imported Media",
+		Home: true,
+	}
+
+	audioExts := map[string]bool{
+		".mp3": true, ".mp4": true, ".m4a": true,
+		".aac": true, ".ogg": true, ".wav": true,
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if !audioExts[ext] {
+			continue
+		}
+
+		fullPath, err := filepath.Abs(filepath.Join(s.ImportDir, entry.Name()))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not resolve path for %s: %v\n", entry.Name(), err)
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not get file info for %s: %v\n", entry.Name(), err)
+			continue
+		}
+
+		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+
+		media := &api.Media{
+			URL:      fullPath,
+			Name:     name,
+			Filename: entry.Name(),
+			Size:     info.Size(),
+			Date:     info.ModTime().Unix(),
+		}
+
+		if s.FriendlyFilenames {
+			media.FriendlyName = entry.Name()
+		}
+
+		cat.Contents = append(cat.Contents, media)
+	}
+
+	if len(cat.Contents) == 0 {
+		return nil, nil
+	}
+
+	if s.Quiet < 1 {
+		fmt.Fprintf(os.Stderr, "imported %d files from %s\n", len(cat.Contents), s.ImportDir)
+	}
+
+	return []*api.Category{cat}, nil
 }

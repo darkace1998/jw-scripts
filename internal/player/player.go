@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/util"
 )
 
 // VideoManager manages the video playback.
@@ -39,7 +40,7 @@ func NewVideoManager(s *config.Settings) *VideoManager {
 	return &VideoManager{
 		wd:       s.WorkDir,
 		replay:   30, // default replay time
-		cmd:      []string{"omxplayer", "--pos", "{}", "--no-osd"},
+		cmd:      []string{"mpv", "--start", "{}", "--no-terminal"},
 		verbose:  s.Quiet < 1,
 		dumpFile: filepath.Join(s.WorkDir, "dump.json"),
 		ctx:      ctx,
@@ -170,7 +171,7 @@ func (m *VideoManager) setRandomVideo() bool {
 	rand.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
 
 	for _, vid := range files {
-		if !contains(m.history, vid) {
+		if !util.Contains(m.history, vid) {
 			m.video = vid
 			m.pos = 0
 			return true
@@ -231,9 +232,13 @@ func (m *VideoManager) playVideo() error {
 }
 
 func (m *VideoManager) addToHistory(video string) {
-	files, _ := m.listVideos()
-	maxLen := len(files) / 2
 	m.history = append(m.history, video)
+	files, err := m.listVideos()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not list videos: %v\n", err)
+		return
+	}
+	maxLen := len(files) / 2
 	if len(m.history) > maxLen {
 		m.history = m.history[len(m.history)-maxLen:]
 	}
@@ -252,13 +257,4 @@ func (m *VideoManager) listVideos() ([]string, error) {
 		}
 	}
 	return videos, nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
