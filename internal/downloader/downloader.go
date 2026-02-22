@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -229,8 +230,16 @@ func downloadMedia(s *config.Settings, media *api.Media, directory string) error
 }
 
 // DownloadFile downloads a file from a URL to a specified path.
-func DownloadFile(url, path string, resume bool, rateLimit float64) error {
-	req, err := http.NewRequest("GET", url, http.NoBody)
+func DownloadFile(rawURL, path string, resume bool, rateLimit float64) error {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("unsupported URL scheme: %s", parsedURL.Scheme)
+	}
+
+	req, err := http.NewRequest("GET", parsedURL.String(), http.NoBody)
 	if err != nil {
 		return err
 	}

@@ -246,7 +246,15 @@ func (c *Client) IsBookAPIAvailable() bool {
 	params.Set("langwritten", "E")
 	requestURL := c.baseURL + "?" + params.Encode()
 
-	req, err := http.NewRequest("GET", requestURL, http.NoBody)
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return false
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return false
+	}
+
+	req, err := http.NewRequest("GET", parsedURL.String(), http.NoBody)
 	if err != nil {
 		return false
 	}

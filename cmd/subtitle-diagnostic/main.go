@@ -161,7 +161,7 @@ func main() {
 		}
 	}()
 
-	err = os.WriteFile(tmpFile.Name(), jsonData, 0o600)
+	_, err = tmpFile.Write(jsonData)
 	if err != nil {
 		fmt.Printf("Warning: could not save diagnostic data: %v\n", err)
 	} else {
