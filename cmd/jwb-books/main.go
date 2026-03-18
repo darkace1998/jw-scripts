@@ -194,10 +194,15 @@ func handleSearch(client *books.Client, language, query string) {
 			fmt.Printf("  Issue: %s\n", book.Issue)
 		}
 
-		// List available formats
+		// List available formats (deduplicated)
+		seen := make(map[string]bool)
 		var formats []string
 		for _, file := range book.Files {
-			formats = append(formats, string(file.Format))
+			f := string(file.Format)
+			if !seen[f] {
+				seen[f] = true
+				formats = append(formats, f)
+			}
 		}
 		if len(formats) > 0 {
 			fmt.Printf("  Available formats: %s\n", strings.Join(formats, ", "))

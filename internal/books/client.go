@@ -218,14 +218,20 @@ func (c *Client) SearchBooks(lang, query string) ([]Book, error) {
 	queryLower := strings.ToLower(query)
 
 	for _, category := range categories {
+		// Check if query matches the category name or key
+		categoryMatch := strings.Contains(strings.ToLower(category.Name), queryLower) ||
+			strings.Contains(strings.ToLower(category.Key), queryLower) ||
+			strings.Contains(strings.ToLower(category.Description), queryLower)
+
 		for _, pubCode := range category.Publications {
 			book, err := c.GetBook(lang, pubCode)
 			if err != nil {
 				continue
 			}
 
-			// Simple text matching
-			if strings.Contains(strings.ToLower(book.Title), queryLower) ||
+			// Match on book title, description, or parent category
+			if categoryMatch ||
+				strings.Contains(strings.ToLower(book.Title), queryLower) ||
 				strings.Contains(strings.ToLower(book.Description), queryLower) {
 				results = append(results, *book)
 			}
