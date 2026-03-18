@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -192,6 +193,10 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 					Size:     fileInfo.FileSize,
 					Checksum: fileInfo.File.Checksum,
 					Title:    fileInfo.Title,
+				}
+				// Extract filename from URL since the API doesn't provide one directly
+				if u, err := url.Parse(fileInfo.File.URL); err == nil {
+					bookFile.Filename = path.Base(u.Path)
 				}
 				book.Files = append(book.Files, bookFile)
 			}

@@ -17,6 +17,7 @@ import (
 )
 
 var settings = &config.Settings{}
+var sinceDate string
 
 var rootCmd = &cobra.Command{
 	Use:   "jwb-index",
@@ -58,7 +59,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&settings.Quality, "quality", "Q", 720, "maximum video quality")
 	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
 	rootCmd.Flags().BoolVar(&settings.SafeFilenames, "safe-filenames", runtime.GOOS == "windows", "use filesystem-safe filenames (automatically enabled on Windows)")
-	rootCmd.Flags().Int64Var(&settings.MinDate, "since", 0, "only index media newer than this date (YYYY-MM-DD)")
+	rootCmd.Flags().StringVar(&sinceDate, "since", "", "only index media newer than this date (YYYY-MM-DD)")
 	rootCmd.Flags().StringVar(&settings.Sort, "sort", "", "sort output (newest, oldest, name, random)")
 	rootCmd.Flags().BoolVar(&settings.Update, "update", false, "update existing categories with the latest videos")
 }
@@ -135,6 +136,15 @@ func run(s *config.Settings) error {
 		}
 	}
 
+	// Parse --since date if provided
+	if sinceDate != "" {
+		t, err := time.Parse("2006-01-02", sinceDate)
+		if err != nil {
+			return fmt.Errorf("invalid --since date %q (expected YYYY-MM-DD): %w", sinceDate, err)
+		}
+		s.MinDate = t.Unix()
+	}
+
 	if s.Latest {
 		// Set date range for 31-day window: from today back to 31 days ago when --latest flag is used
 		now := time.Now()
@@ -158,6 +168,9 @@ func run(s *config.Settings) error {
 		// Run mode is handled by the output.CreateOutput function
 		// which will use the CommandWriter to execute the configured command
 	}
+
+	// Convert MiB to bytes for disk space calculations
+	s.KeepFree *= 1024 * 1024
 
 	if s.WorkDir == "" {
 		s.WorkDir = "."

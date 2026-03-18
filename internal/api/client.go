@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,7 +31,13 @@ const (
 	// subtitleMatchBonus is the ranking bonus applied when a video's subtitle
 	// state matches the requested preference.
 	subtitleMatchBonus = 100
+
+	// maxResponseSize is the maximum allowed API response body size (10 MiB).
+	maxResponseSize = 10 << 20
 )
+
+// parseDateMillisRegex strips milliseconds from date strings for fallback parsing.
+var parseDateMillisRegex = regexp.MustCompile(`\.\d+Z$`)
 
 // Client is a client for the JW.ORG API.
 type Client struct {
@@ -64,7 +71,7 @@ func (c *Client) GetLanguages() ([]Language, error) {
 	}
 
 	var langResp LanguagesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&langResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&langResp); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +92,7 @@ func (c *Client) GetRootCategories() ([]string, error) {
 	}
 
 	var rootResp RootCategoriesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&rootResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&rootResp); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +147,7 @@ func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
 	}
 
 	var catResp CategoryResponse
-	if err := json.NewDecoder(resp.Body).Decode(&catResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&catResp); err != nil {
 		return nil, err
 	}
 
@@ -250,7 +257,7 @@ func (c *Client) fetchPubMediaMP3s(pubCode string) ([]PubMediaFile, error) {
 	}
 
 	var pubResp PubMediaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&pubResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&pubResp); err != nil {
 		return nil, err
 	}
 
@@ -335,21 +342,21 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 
 			var bestFile *File
 
-switch {
-		case m.Type == "audio":
-			if len(m.Files) > 0 {
-				bestFile = &m.Files[0]
-			}
-		case c.settings.AudioOnly:
-			// When audio-only mode is enabled, try to find an audio file
-			bestFile = getBestAudio(m.Files)
-			if bestFile == nil {
-				if c.settings.Quiet < 1 {
-					fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
+			switch {
+			case m.Type == "audio":
+				if len(m.Files) > 0 {
+					bestFile = &m.Files[0]
 				}
-				continue
-			}
-		default:
+			case c.settings.AudioOnly:
+				// When audio-only mode is enabled, try to find an audio file
+				bestFile = getBestAudio(m.Files)
+				if bestFile == nil {
+					if c.settings.Quiet < 1 {
+						fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
+					}
+					continue
+				}
+			default:
 				bestFile = getBestVideo(m.Files, c.settings.Quality, c.settings.HardSubtitles)
 			}
 
@@ -474,8 +481,7 @@ func parseDate(dateString string) (time.Time, error) {
 		return t.UTC(), nil
 	}
 	// Strip milliseconds and parse as UTC
-	re := regexp.MustCompile(`\.\d+Z$`)
-	dateString = re.ReplaceAllString(dateString, "")
+	dateString = parseDateMillisRegex.ReplaceAllString(dateString, "")
 	t, err := time.Parse("2006-01-02T15:04:05", dateString)
 	if err != nil {
 		return time.Time{}, err

@@ -90,6 +90,9 @@ func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error
 }
 
 func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error {
+	originalFilename := s.OutputFilename
+	defer func() { s.OutputFilename = originalFilename }()
+
 	for _, category := range data {
 		var categoryMedia []*api.Media
 		for _, item := range category.Contents {
@@ -110,7 +113,6 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 		sortMedia(categoryMedia, s.Sort)
 
 		// Create separate output file for each category
-		originalFilename := s.OutputFilename
 		if originalFilename == "" {
 			s.OutputFilename = fmt.Sprintf("%s.%s", category.Key, getDefaultExtension(s.Mode))
 		} else {
@@ -132,12 +134,10 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 			categoryWriter, err = NewHTMLWriter(s)
 		default:
 			// For stdout and run modes, we can't really do "multi" so just use single output
-			s.OutputFilename = originalFilename
 			return outputSingle(s, data, writer)
 		}
 
 		if err != nil {
-			s.OutputFilename = originalFilename
 			return err
 		}
 
@@ -154,12 +154,8 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 		}
 
 		if err := categoryWriter.Dump(); err != nil {
-			s.OutputFilename = originalFilename
 			return err
 		}
-
-		// Restore original filename
-		s.OutputFilename = originalFilename
 	}
 
 	return nil
@@ -259,7 +255,7 @@ func sortMedia(mediaList []*api.Media, sortKey string) {
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
+	return err == nil
 }
 
 // --- TxtWriter ---
