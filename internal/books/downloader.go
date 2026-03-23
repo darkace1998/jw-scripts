@@ -46,7 +46,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0o750); err != nil {
-		return fmt.Errorf("failed to create output directory: %v", err)
+		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	// Determine output file path
@@ -70,7 +70,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 
 	// Ensure the parent directory exists
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
-		return fmt.Errorf("failed to create parent directory for %s: %v", outputPath, err)
+		return fmt.Errorf("failed to create parent directory for %s: %w", outputPath, err)
 	}
 
 	return downloader.DownloadFile(targetFile.URL, outputPath, false, d.settings.RateLimit)
@@ -92,7 +92,7 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 	// Create category subdirectory
 	categoryDir := filepath.Join(outputDir, category.Key)
 	if err := os.MkdirAll(categoryDir, 0o750); err != nil {
-		return fmt.Errorf("failed to create category directory: %v", err)
+		return fmt.Errorf("failed to create category directory: %w", err)
 	}
 
 	successCount := 0
@@ -132,13 +132,13 @@ func (d *Downloader) ValidateChecksum(filePath, expectedChecksum string) error {
 	// #nosec G304 - Path is for file checksum verification in download process
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open file for checksum validation: %v", err)
+		return fmt.Errorf("failed to open file for checksum validation: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 
 	hash := md5.New() // #nosec G401 - MD5 used for file integrity verification, not cryptographic security
 	if _, err := io.Copy(hash, file); err != nil {
-		return fmt.Errorf("failed to compute checksum: %v", err)
+		return fmt.Errorf("failed to compute checksum: %w", err)
 	}
 	actualChecksum := hex.EncodeToString(hash.Sum(nil))
 	// Compare checksums case-insensitively

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/api"
 	"github.com/darkace1998/jw-scripts/internal/config"
@@ -16,6 +17,7 @@ import (
 )
 
 var settings = &config.Settings{}
+var sinceDate string
 
 // musicCategories defines all the music-related categories available for download
 var musicCategories = []string{
@@ -75,7 +77,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&settings.Warning, "no-warning", true, "do not warn when space limit seems wrong")
 	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
 	rootCmd.Flags().BoolVar(&settings.SafeFilenames, "safe-filenames", runtime.GOOS == "windows", "use filesystem-safe filenames (automatically enabled on Windows)")
-	rootCmd.Flags().Int64Var(&settings.MinDate, "since", 0, "only index music newer than this date (YYYY-MM-DD)")
+	rootCmd.Flags().StringVar(&sinceDate, "since", "", "only index music newer than this date (YYYY-MM-DD)")
 	rootCmd.Flags().StringVar(&settings.Sort, "sort", "", "sort output (newest, oldest, name, random)")
 	rootCmd.Flags().BoolVar(&settings.Update, "update", false, "update existing categories with the latest music")
 }
@@ -131,6 +133,18 @@ func run(s *config.Settings) error {
 			s.Sort = "newest"
 		}
 	}
+
+	// Parse --since date if provided
+	if sinceDate != "" {
+		t, err := time.Parse("2006-01-02", sinceDate)
+		if err != nil {
+			return fmt.Errorf("invalid --since date %q (expected YYYY-MM-DD): %w", sinceDate, err)
+		}
+		s.MinDate = t.Unix()
+	}
+
+	// Convert MiB to bytes for disk space calculations
+	s.KeepFree *= 1024 * 1024
 
 	if s.WorkDir == "" {
 		s.WorkDir = "./music"

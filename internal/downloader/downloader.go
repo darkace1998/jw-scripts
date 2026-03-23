@@ -265,10 +265,13 @@ func DownloadFile(rawURL, path string, resume bool, rateLimit float64) error {
 	}
 
 	var out *os.File
-	if resume {
+	if resume && resp.StatusCode == http.StatusPartialContent {
+		// Server supports range requests; append to existing file
 		// #nosec G304 - Path is from download logic for legitimate file operations
 		out, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
 	} else {
+		// Server returned full content (200) or fresh download; truncate and write from start
+		start = 0
 		// #nosec G304 - Path is from download logic for legitimate file operations
 		out, err = os.Create(path)
 	}
@@ -278,6 +281,10 @@ func DownloadFile(rawURL, path string, resume bool, rateLimit float64) error {
 	defer func() { _ = out.Close() }()
 
 	size := resp.ContentLength + start
+	if resp.ContentLength < 0 {
+		// Unknown content length; use -1 to indicate indeterminate progress
+		size = -1
+	}
 
 	bar := progressbar.NewOptions64(
 		size,
@@ -407,7 +414,7 @@ func getOldestMP4(directory string) (os.FileInfo, error) {
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
+	return err == nil
 }
 
 // throttledReader is a reader that is throttled to a certain rate.

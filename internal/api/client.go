@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,9 +20,10 @@ import (
 const (
 	baseURL     = "https://data.jw-api.org/mediator/v1"
 	pubMediaURL = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
-	// jwbYearBase is subtracted from the current year to derive the JWB issue number.
-	// For example, 2026 - 1892 = 134 (i.e. jwb-134).
-	jwbYearBase = 1892
+	// jwbStartYear and jwbStartMonth mark when JW Broadcasting began (October 2014 = issue 1).
+	// Issue numbers are sequential months: issue = (year-2014)*12 + month - 10 + 1
+	jwbStartYear  = 2014
+	jwbStartMonth = 10
 
 	// qualityMatchBonus is the ranking bonus applied when a video resolution
 	// is within the requested quality limit.
@@ -30,7 +32,13 @@ const (
 	// subtitleMatchBonus is the ranking bonus applied when a video's subtitle
 	// state matches the requested preference.
 	subtitleMatchBonus = 100
+
+	// maxResponseSize is the maximum allowed API response body size (10 MiB).
+	maxResponseSize = 10 << 20
 )
+
+// parseDateMillisRegex strips milliseconds from date strings for fallback parsing.
+var parseDateMillisRegex = regexp.MustCompile(`\.\d+Z$`)
 
 // Client is a client for the JW.ORG API.
 type Client struct {
@@ -64,7 +72,7 @@ func (c *Client) GetLanguages() ([]Language, error) {
 	}
 
 	var langResp LanguagesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&langResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&langResp); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +93,7 @@ func (c *Client) GetRootCategories() ([]string, error) {
 	}
 
 	var rootResp RootCategoriesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&rootResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&rootResp); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +148,7 @@ func (c *Client) GetCategory(lang, key string) (*CategoryResponse, error) {
 	}
 
 	var catResp CategoryResponse
-	if err := json.NewDecoder(resp.Body).Decode(&catResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&catResp); err != nil {
 		return nil, err
 	}
 
@@ -159,10 +167,11 @@ func (c *Client) GetBroadcastingMP3s() ([]*Category, error) {
 		Home: true,
 	}
 
-	// Search through recent JWB issues (going back about 3 years)
-	// Each jwb-NNN publication contains monthly programs for that year
-	startIssue := time.Now().Year() - jwbYearBase
-	endIssue := startIssue - 10 // Go back about 10 years worth of issues
+	// Compute the current JWB issue number. Issues are numbered sequentially by
+	// month starting from October 2014 (issue 1). Going back 36 issues = 3 years.
+	now := time.Now()
+	startIssue := (now.Year()-jwbStartYear)*12 + int(now.Month()) - jwbStartMonth + 1
+	endIssue := startIssue - 36 // Go back 3 years worth of monthly issues
 
 	for issue := startIssue; issue >= endIssue; issue-- {
 		pubCode := fmt.Sprintf("jwb-%d", issue)
@@ -250,7 +259,7 @@ func (c *Client) fetchPubMediaMP3s(pubCode string) ([]PubMediaFile, error) {
 	}
 
 	var pubResp PubMediaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&pubResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&pubResp); err != nil {
 		return nil, err
 	}
 
@@ -335,21 +344,21 @@ func (c *Client) ParseBroadcasting() ([]*Category, error) {
 
 			var bestFile *File
 
-switch {
-		case m.Type == "audio":
-			if len(m.Files) > 0 {
-				bestFile = &m.Files[0]
-			}
-		case c.settings.AudioOnly:
-			// When audio-only mode is enabled, try to find an audio file
-			bestFile = getBestAudio(m.Files)
-			if bestFile == nil {
-				if c.settings.Quiet < 1 {
-					fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
+			switch {
+			case m.Type == "audio":
+				if len(m.Files) > 0 {
+					bestFile = &m.Files[0]
 				}
-				continue
-			}
-		default:
+			case c.settings.AudioOnly:
+				// When audio-only mode is enabled, try to find an audio file
+				bestFile = getBestAudio(m.Files)
+				if bestFile == nil {
+					if c.settings.Quiet < 1 {
+						fmt.Fprintf(os.Stderr, "no audio files found for: %s (skipping video-only content)\n", m.Title)
+					}
+					continue
+				}
+			default:
 				bestFile = getBestVideo(m.Files, c.settings.Quality, c.settings.HardSubtitles)
 			}
 
@@ -474,8 +483,7 @@ func parseDate(dateString string) (time.Time, error) {
 		return t.UTC(), nil
 	}
 	// Strip milliseconds and parse as UTC
-	re := regexp.MustCompile(`\.\d+Z$`)
-	dateString = re.ReplaceAllString(dateString, "")
+	dateString = parseDateMillisRegex.ReplaceAllString(dateString, "")
 	t, err := time.Parse("2006-01-02T15:04:05", dateString)
 	if err != nil {
 		return time.Time{}, err
