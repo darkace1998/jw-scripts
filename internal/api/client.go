@@ -20,9 +20,10 @@ import (
 const (
 	baseURL     = "https://data.jw-api.org/mediator/v1"
 	pubMediaURL = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
-	// jwbYearBase is subtracted from the current year to derive the JWB issue number.
-	// For example, 2026 - 1892 = 134 (i.e. jwb-134).
-	jwbYearBase = 1892
+	// jwbStartYear and jwbStartMonth mark when JW Broadcasting began (October 2014 = issue 1).
+	// Issue numbers are sequential months: issue = (year-2014)*12 + month - 10 + 1
+	jwbStartYear  = 2014
+	jwbStartMonth = 10
 
 	// qualityMatchBonus is the ranking bonus applied when a video resolution
 	// is within the requested quality limit.
@@ -166,10 +167,11 @@ func (c *Client) GetBroadcastingMP3s() ([]*Category, error) {
 		Home: true,
 	}
 
-	// Search through recent JWB issues (going back about 3 years)
-	// Each jwb-NNN publication contains monthly programs for that year
-	startIssue := time.Now().Year() - jwbYearBase
-	endIssue := startIssue - 10 // Go back about 10 years worth of issues
+	// Compute the current JWB issue number. Issues are numbered sequentially by
+	// month starting from October 2014 (issue 1). Going back 36 issues = 3 years.
+	now := time.Now()
+	startIssue := (now.Year()-jwbStartYear)*12 + int(now.Month()) - jwbStartMonth + 1
+	endIssue := startIssue - 36 // Go back 3 years worth of monthly issues
 
 	for issue := startIssue; issue >= endIssue; issue-- {
 		pubCode := fmt.Sprintf("jwb-%d", issue)
