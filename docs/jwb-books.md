@@ -1,4 +1,4 @@
-# JWB Books Wiki
+# jwb-books Reference
 
 This page documents the command-line arguments and usage for the `jwb-books` command.
 

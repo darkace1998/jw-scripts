@@ -1,4 +1,4 @@
-# JW Scripts Wiki
+# JW Scripts Command Reference
 
 This page documents the command-line arguments for the `jwb-index` and `jwb-offline` commands.
 

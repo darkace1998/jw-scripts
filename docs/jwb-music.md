@@ -1,4 +1,4 @@
-# JWB Music Wiki
+# jwb-music Reference
 
 This page documents the command-line arguments and usage for the `jwb-music` command.
 

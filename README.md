@@ -1,151 +1,114 @@
-# JW Scripts (Go Version)
+# JW Scripts (Go)
 
-This project is a Go-based reimplementation of the [original Python scripts](https://github.com/allejok96/jw-scripts) for interacting with jw.org content. It offers improved performance and modern features while maintaining compatibility with the original command-line flags.
+[![Go Version](https://img.shields.io/github/go-mod/go-version/darkace1998/jw-scripts)](https://go.dev/)
+[![License](https://img.shields.io/github/license/darkace1998/jw-scripts)](./COPYING)
+[![CI](https://img.shields.io/github/actions/workflow/status/darkace1998/jw-scripts/ci.yml?branch=master)](https://github.com/darkace1998/jw-scripts/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/darkace1998/jw-scripts)](https://github.com/darkace1998/jw-scripts/releases)
 
-*These methods of accessing jw.org are, while legal, not officially supported by the organisation. Use them if you find it worth the time, pain and risk. But first, please take the time to read [w18.04 30-31](https://wol.jw.org/en/wol/d/r1/lp-e/2018364). Then consider buying a device which has official support for JW Broadcasting app. Like a Roku, Apple TV or Amazon Fire TV. It will give you a better and safer experience.*
+`jw-scripts` is a Go CLI suite for indexing, downloading, and playing media from jw.org, plus downloading publication files in multiple formats.
 
-### JW Broadcasting and Publications anywhere
+This project is a Go reimplementation of the original Python version: https://github.com/allejok96/jw-scripts
 
-With these scripts you can get the latest JW Broadcasting videos and publications automatically downloaded. You can turn a computer (like a Raspberry Pi) into a JW TV, either by streaming directly, or by playing downloaded videos from your collection.
+> These access methods are legal according to JW.org terms, but they are not officially supported. Please review [w18.04 30-31](https://wol.jw.org/en/wol/d/r1/lp-e/2018364) and consider official platform apps where available.
 
-## Get started
+## Quick start
 
-You have two options to get started with the Go version of JW Scripts:
+### Option 1: Download prebuilt binaries
 
-### Option 1: Download Pre-built Binaries (Recommended)
+Download the latest binaries from:
+https://github.com/darkace1998/jw-scripts/releases/latest
 
-Pre-built binaries are available for multiple platforms from the [Releases page](https://github.com/darkace1998/jw-scripts/releases/latest):
+Supported targets:
+- Linux (amd64, arm64)
+- Windows (amd64, arm64)
+- macOS (amd64, arm64)
 
-- **Linux** (amd64, arm64)
-- **Windows** (amd64, arm64) 
-- **macOS** (Intel, Apple Silicon)
-
-Simply download the appropriate binary for your platform and make it executable (Linux/macOS):
-```bash
-chmod +x jwb-index-linux-amd64 jwb-offline-linux-amd64
-```
-
-### Option 2: Building from Source
-
-If you prefer to build from source, you will need to have Go installed on your system.
-
-### Building the project
-
-To build all the command-line tools, run the following command from the root of the project:
+### Option 2: Build from source
 
 ```bash
+go mod download
 go build -o bin/ ./cmd/...
 ```
 
-This will create the executables in a `bin` directory.
+## Commands
 
-### Running the applications
+### `jwb-index`
 
-#### JW Broadcasting Videos and Audio
-
-For example, to download the latest videos in Swedish, you would run:
+Indexes and optionally downloads JW Broadcasting media.
 
 ```bash
-./bin/jwb-index --download --latest --lang=S
+# Download latest 31-day window in Swedish
+./bin/jwb-index --download --latest --lang S
+
+# Generate a playlist file
+./bin/jwb-index --mode txt --output playlist.txt
 ```
 
-To play downloaded videos, you can use the `jwb-offline` command:
+### `jwb-music`
+
+Downloads music/audio categories (including optional JW Broadcasting audio).
 
 ```bash
-./bin/jwb-offline /path/to/your/videos
-```
-
-#### JW Music Downloads
-
-The `jwb-music` command is a specialized tool for downloading all music files from jw.org:
-
-```bash
-# Download all music files in English
+# Download all music in English
 ./bin/jwb-music
 
-# Download music files in Spanish with friendly filenames
-./bin/jwb-music --lang=S --friendly
-
-# List available music categories
-./bin/jwb-music --list-categories
-
-# Download only specific music categories
-./bin/jwb-music --category=AudioOriginalSongs,SJJChorus
-
-# Download to a specific directory
-./bin/jwb-music ./my-music-folder
+# Download selected categories in Spanish
+./bin/jwb-music --lang S --category AudioOriginalSongs,SJJChorus
 ```
 
-The command downloads from all music-related categories including:
-- Original Songs
-- "Sing Out Joyfully" (Meetings, Vocals, Instrumental)  
-- Children's Songs
-- Kingdom Melodies
+### `jwb-books`
 
-#### JW Publications (Books, Magazines) - Framework Implementation
-
-**Note**: This feature is currently a framework implementation as the JW.org API does not provide access to publications.
+Downloads JW publication files and supports search, categories, and format selection.
 
 ```bash
-# Display help information
-./bin/jwb-books --help
-
-# List supported languages
-./bin/jwb-books --list-languages
-
-# List available book categories
+# List categories
 ./bin/jwb-books --list-categories --language E
 
-# List supported download formats
-./bin/jwb-books --list-formats
-
-# Search for specific publications
-./bin/jwb-books --search="watchtower" --language E
-
-# Download books by category in PDF format
-./bin/jwb-books --category=bible-study --language E --format=pdf --output=./books
-
-# Download magazines in EPUB format
-./bin/jwb-books --category=magazines --language E --format=epub --output=./publications
+# Download a category in PDF
+./bin/jwb-books --category daily-text --language E --format pdf --output ./books
 ```
 
-See [jwb-books.md](jwb-books.md) for detailed `jwb-books` usage and categories.
+### `jwb-offline`
 
-Next, check out the [Wiki pages](https://github.com/allejok96/jw-scripts/wiki) for more examples and options. The command-line flags are the same as the original Python version.
+Plays downloaded local videos with shuffle/replay behavior.
 
-## Questions
+```bash
+./bin/jwb-offline /path/to/downloaded/videos
+```
 
-#### Is this legal?
+## Documentation
 
-Yes. The [Terms of Service](http://www.jw.org/en/terms-of-use/) allows:
+- Main command wiki: [docs/WIKI.md](docs/WIKI.md)
+- Books command details: [docs/jwb-books.md](docs/jwb-books.md)
+- Music command details: [docs/jwb-music.md](docs/jwb-music.md)
+- Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+
+## Development
+
+```bash
+# Tests
+go test -v ./...
+
+# Race-enabled tests
+go test -v -race ./...
+
+# Lint
+golangci-lint run --timeout=5m
+```
+
+CI and release automation are implemented with GitHub Actions:
+- CI: tests, linting, security scan, binary build checks
+- Release: multi-platform binaries and archives on `v*` tags
+
+## Legal
+
+JW.org Terms of Use allow:
 
 > distribution of free, non-commercial applications designed to download electronic files (for example, EPUB, PDF, MP3, AAC, MOBI, and MP4 files) from public areas of this site.
 
-I've also been in contact with the Scandinavian branch office, and they have confirmed that using software like this is legal according to the ToS.
+Reference: http://www.jw.org/en/terms-of-use/
 
-___
+## License
 
-## Development and Contributing
-
-This project uses GitHub Actions for automated testing and releases:
-
-- **Continuous Integration**: Automatic testing on multiple Go versions, linting, and security scanning
-- **Automated Releases**: Cross-platform binaries are automatically built and released when tags are pushed
-- **Code Quality**: Enforced code formatting, linting, and test coverage
-
-To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
-
-### Creating a Release
-
-To create a new release with pre-built binaries:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-This will automatically build binaries for all supported platforms and create a GitHub release.
-
-___
-
-If you have a feature request or have been bitten by a bug, please [create an issue](https://github.com/allejok96/jw-scripts/issues), and I'll see what I can do.
+GNU GPL v3.0 — see [COPYING](COPYING).

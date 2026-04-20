@@ -19,11 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed playlist output modes failing with `output filename is required for txt mode` when no explicit output filename was provided.
-- Fixed stale README link by replacing missing `docs/BOOK_DOWNLOAD_ANALYSIS.md` reference with `jwb-books.md`.
+- Fixed stale README link by replacing missing `docs/BOOK_DOWNLOAD_ANALYSIS.md` reference with `docs/jwb-books.md`.
 
 ### Documentation
 - Updated `CONTRIBUTING.md` to match current Go/CI expectations (Go 1.25+, CI matrix 1.25/1.26, build command guidance).
-- Updated `WIKI.md` and `jwb-music.md` flag tables for `--output`, `--latest`, and `--limit-rate` accuracy.
+- Updated `docs/WIKI.md` and `docs/jwb-music.md` flag tables for `--output`, `--latest`, and `--limit-rate` accuracy.
 
 ## [v1.6.3] - 2026-03-23
 
