@@ -4,10 +4,10 @@ Thank you for your interest in contributing to JW Scripts!
 
 ## Development Setup
 
-1. Ensure you have Go 1.24 or later installed
+1. Ensure you have Go 1.25 or later installed
 2. Clone the repository
 3. Run `go mod download` to install dependencies
-4. Build the project: `go build -o bin/ ./...`
+4. Build the project: `go build -o bin/ ./cmd/...`
 
 ## Testing
 
@@ -42,7 +42,7 @@ The project uses GitHub Actions for CI/CD:
 
 ### CI Workflow (`.github/workflows/ci.yml`)
 - Runs on push to main/master and pull requests
-- Tests against multiple Go versions (1.24, 1.25)
+- Tests against multiple Go versions (1.25, 1.26)
 - Includes linting, security scanning, and race condition testing
 - Builds binaries and tests basic functionality
 

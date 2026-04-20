@@ -34,6 +34,9 @@ func CreateOutput(s *config.Settings, data []*api.Category) error {
 	if s.Mode == "filesystem" {
 		return outputFilesystem(s, data)
 	}
+	if s.OutputFilename == "" && requiresOutputFilename(s.Mode) {
+		s.OutputFilename = fmt.Sprintf("playlist.%s", getDefaultExtension(s.Mode))
+	}
 
 	var writer Writer
 	var err error
@@ -61,6 +64,12 @@ func CreateOutput(s *config.Settings, data []*api.Category) error {
 		return outputMulti(s, data, writer)
 	}
 	return outputSingle(s, data, writer)
+}
+
+func requiresOutputFilename(mode string) bool {
+	return strings.HasPrefix(mode, "txt") ||
+		strings.HasPrefix(mode, "m3u") ||
+		strings.HasPrefix(mode, "html")
 }
 
 func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error {

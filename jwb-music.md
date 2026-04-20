@@ -47,6 +47,7 @@ jwb-music -L
 | `--limit-rate` | `-R` | `25.0` | maximum download rate, in megabytes/s |
 | `--list-categories` | | `false` | list all available music categories |
 | `--mode` | `-m` | `""` | output mode (filesystem, html, m3u, run, stdout, txt) |
+| `--output` | `-o` | `""` | output filename for txt/m3u/html modes |
 | `--no-warning` | | `true` | do not warn when space limit seems wrong |
 | `--quiet` | `-q` | `0` | less info, can be used multiple times |
 | `--safe-filenames` | | `false` (Windows: `true`) | use filesystem-safe filenames (automatically enabled on Windows) |

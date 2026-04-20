@@ -109,7 +109,7 @@ The command downloads from all music-related categories including:
 ./bin/jwb-books --category=magazines --language E --format=epub --output=./publications
 ```
 
-See [docs/BOOK_DOWNLOAD_ANALYSIS.md](docs/BOOK_DOWNLOAD_ANALYSIS.md) for detailed information about the API analysis and framework implementation.
+See [jwb-books.md](jwb-books.md) for detailed `jwb-books` usage and categories.
 
 Next, check out the [Wiki pages](https://github.com/allejok96/jw-scripts/wiki) for more examples and options. The command-line flags are the same as the original Python version.
 

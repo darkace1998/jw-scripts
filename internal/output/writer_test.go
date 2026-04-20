@@ -2,9 +2,11 @@ package output
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/darkace1998/jw-scripts/internal/api"
 	"github.com/darkace1998/jw-scripts/internal/config"
 )
 
@@ -72,4 +74,43 @@ func TestCommandWriter(_ *testing.T) {
 	writer.Add(entry)
 	// Note: We don't test Dump() here as it would actually execute the command
 	// This test just verifies the writer can be created and entries added
+}
+
+func TestCreateOutputUsesDefaultFilenameForTextModes(t *testing.T) {
+	dir := t.TempDir()
+	settings := &config.Settings{
+		Mode:    "txt",
+		WorkDir: dir,
+		SubDir:  "jwb-E",
+	}
+
+	data := []*api.Category{
+		{
+			Key:  "VideoOnDemand",
+			Name: "Video on Demand",
+			Contents: []interface{}{
+				&api.Media{
+					Name: "Test Video",
+					URL:  "https://example.com/test.mp4",
+				},
+			},
+		},
+	}
+
+	if err := CreateOutput(settings, data); err != nil {
+		t.Fatalf("CreateOutput() returned error: %v", err)
+	}
+
+	if settings.OutputFilename != "playlist.txt" {
+		t.Fatalf("expected default output filename playlist.txt, got %q", settings.OutputFilename)
+	}
+
+	// #nosec G304 - path is constrained to t.TempDir() in this test
+	content, err := os.ReadFile(filepath.Join(dir, "playlist.txt"))
+	if err != nil {
+		t.Fatalf("expected output file to be created: %v", err)
+	}
+	if !strings.Contains(string(content), "https://example.com/test.mp4") {
+		t.Fatalf("expected output file to contain media URL, got: %s", content)
+	}
 }
