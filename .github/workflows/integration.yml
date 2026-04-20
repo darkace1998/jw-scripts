@@ -1,0 +1,80 @@
+name: Integration
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sundays at 01:00 UTC
+    - cron: '0 1 * * 0'
+
+jobs:
+  download-smoke:
+    name: Download Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.25-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.25-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build binaries
+      run: go build -v -o bin/ ./cmd/...
+
+    - name: Smoke test all applications
+      run: |
+        ./bin/jwb-index --help
+        ./bin/jwb-music --help
+        ./bin/jwb-books --help
+        ./bin/jwb-offline --help
+
+    - name: Download one publication file (retry)
+      run: |
+        set -euo pipefail
+        mkdir -p integration-artifacts/books
+        for attempt in 1 2 3; do
+          if ./bin/jwb-books --category daily-text --language E --format pdf --output ./integration-artifacts/books; then
+            break
+          fi
+          if [ "$attempt" -eq 3 ]; then
+            echo "jwb-books download failed after 3 attempts"
+            exit 1
+          fi
+          sleep $((attempt * 5))
+        done
+
+    - name: Verify downloaded files
+      run: |
+        set -euo pipefail
+        pdf_count=$(find ./integration-artifacts/books -type f -name '*.pdf' | wc -l | tr -d ' ')
+        if [ "$pdf_count" -lt 1 ]; then
+          echo "Expected at least one PDF download, found none"
+          find ./integration-artifacts -maxdepth 3 -type f | sed 's/^/  /'
+          exit 1
+        fi
+        echo "Downloaded PDF files: $pdf_count"
+
+    - name: Upload integration artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-download-artifacts
+        path: integration-artifacts/

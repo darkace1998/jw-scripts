@@ -44,7 +44,13 @@ The project uses GitHub Actions for CI/CD:
 - Runs on push to main/master and pull requests
 - Tests against multiple Go versions (1.25, 1.26)
 - Includes linting, security scanning, and race condition testing
-- Builds binaries and tests basic functionality
+- Builds binaries and smoke-tests all CLI applications (`jwb-index`, `jwb-music`, `jwb-books`, `jwb-offline`)
+
+### Integration Workflow (`.github/workflows/integration.yml`)
+- Runs weekly and on manual dispatch
+- Builds binaries and executes cross-command smoke checks
+- Runs a network-backed download smoke test (`jwb-books`) and verifies at least one file is downloaded
+- Uploads artifacts from integration runs for troubleshooting
 
 ### Release Workflow (`.github/workflows/release.yml`)
 - Triggered by pushing tags matching `v*` pattern

@@ -86,6 +86,9 @@ jobs:
     - name: Test binaries
       run: |
         ./bin/jwb-index --help
+        ./bin/jwb-music --help
+        ./bin/jwb-books --help
+        ./bin/jwb-books --list-formats
         ./bin/jwb-offline --help
 
   lint:
