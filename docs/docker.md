@@ -37,6 +37,39 @@ docker run --rm \
 | `RUN_ON_STARTUP` | `true` | If `true`, executes one run before starting cron |
 | `TZ` | `UTC` | Timezone used inside the container |
 
+## Cron schedule explained
+
+`CRON_SCHEDULE` uses the standard 5-field cron format:
+
+```text
+* * * * *
+| | | | |
+| | | | +-- day of week (0-6, Sun=0)
+| | | +---- month (1-12)
+| | +------ day of month (1-31)
+| +-------- hour (0-23)
++---------- minute (0-59)
+```
+
+Supported syntax:
+
+- `*` any value (for example every hour)
+- `*/N` every N units (for example `*/15` every 15 minutes)
+- `A,B` specific values (for example `1,15`)
+- `A-B` ranges (for example `1-5`)
+
+Quick examples:
+
+- `0 */6 * * *` run every 6 hours
+- `30 3 * * *` run daily at 03:30
+- `0 6 * * 1-5` run at 06:00 on weekdays
+- `0 0 1 * *` run on the first day of each month
+
+Tips:
+
+- Set `TZ` if you want local-time scheduling instead of UTC.
+- Use `RUN_ON_STARTUP=true` to execute immediately when the container starts, then continue on the cron schedule.
+
 ## Common command examples
 
 ```bash
