@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.7.0] - 2026-04-20
+
+### Added
+- Added Docker runtime support (`Dockerfile`, `.dockerignore`, `docker-entrypoint.sh`) with cron-driven automation via environment variables.
+- Added Docker usage documentation at `docs/docker.md`.
+- Added `.github/workflows/docker.yml` for Docker build/publish automation.
+
+### Changed
+- Updated Docker workflow publishing policy to push GHCR images only on version tags (`v*`), not on branch pushes.
+
+### Documentation
+- Updated `README.md` and `CONTRIBUTING.md` with Docker runtime and Docker workflow details.
+
 ## [v1.6.4] - 2026-04-20
 
 ### Added
@@ -12,15 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added default output filename behavior in playlist modes (`playlist.txt`, `playlist.m3u`, `playlist.html`) when `--output` is not set.
 - Added regression test coverage for default output filename behavior in `internal/output`.
 - Added `.github/copilot-instructions.md` to improve future Copilot-assisted development in this repository.
-- Added Docker runtime support (`Dockerfile`, `.dockerignore`, `docker-entrypoint.sh`) with cron-driven automation via environment variables.
-- Added Docker usage documentation at `docs/docker.md`.
-- Added `.github/workflows/docker.yml` for Docker build/publish automation.
 
 ### Changed
 - Updated CI to run on pull requests targeting `main` and `master` in addition to existing triggers.
 - Updated `--latest` config test expectations to match current behavior (past 31 days through end of today) and use UTC-stable calculations.
 - Reworked `README.md` for a more professional structure and moved command-specific markdown docs into `docs/`.
-- Updated Docker workflow publishing policy to push GHCR images only on version tags (`v*`), not on branch pushes.
 
 ### Fixed
 - Fixed playlist output modes failing with `output filename is required for txt mode` when no explicit output filename was provided.

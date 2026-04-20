@@ -14,7 +14,7 @@ docker build -t jw-scripts:latest .
 docker pull ghcr.io/darkace1998/jw-scripts:latest
 ```
 
-Version-tagged images are also published for release tags (for example `v1.6.4`).
+Version-tagged images are also published for release tags (for example `v1.7.0`).
 
 ## Run
 
