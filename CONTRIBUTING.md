@@ -52,6 +52,11 @@ The project uses GitHub Actions for CI/CD:
 - Runs a network-backed download smoke test (`jwb-books`) and verifies at least one file is downloaded
 - Uploads artifacts from integration runs for troubleshooting
 
+### Docker Workflow (`.github/workflows/docker.yml`)
+- Runs on tags (`v*`), pull requests, and manual dispatch
+- Builds a multi-platform image (`linux/amd64`, `linux/arm64`)
+- Pushes images to GitHub Container Registry (`ghcr.io/darkace1998/jw-scripts`) only for version tags (`v*`)
+
 ### Release Workflow (`.github/workflows/release.yml`)
 - Triggered by pushing tags matching `v*` pattern
 - Builds binaries for multiple platforms:

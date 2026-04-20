@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/github/license/darkace1998/jw-scripts)](./COPYING)
 [![CI](https://img.shields.io/github/actions/workflow/status/darkace1998/jw-scripts/ci.yml?branch=master)](https://github.com/darkace1998/jw-scripts/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/darkace1998/jw-scripts)](https://github.com/darkace1998/jw-scripts/releases)
+[![Docker](https://img.shields.io/github/actions/workflow/status/darkace1998/jw-scripts/docker.yml?branch=master&label=docker)](https://github.com/darkace1998/jw-scripts/actions/workflows/docker.yml)
 
 `jw-scripts` is a Go CLI suite for indexing, downloading, and playing media from jw.org, plus downloading publication files in multiple formats.
 
@@ -28,6 +29,23 @@ Supported targets:
 ```bash
 go mod download
 go build -o bin/ ./cmd/...
+```
+
+### Option 3: Run with Docker (scheduled updates)
+
+```bash
+docker build -t jw-scripts:latest .
+docker run --rm \
+  -e CRON_SCHEDULE="0 */6 * * *" \
+  -e JW_COMMAND="jwb-index --download --update --lang E /data" \
+  -v "$(pwd)/data:/data" \
+  jw-scripts:latest
+```
+
+Prebuilt image from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/darkace1998/jw-scripts:latest
 ```
 
 ## Commands
@@ -81,6 +99,7 @@ Plays downloaded local videos with shuffle/replay behavior.
 - Main command wiki: [docs/WIKI.md](docs/WIKI.md)
 - Books command details: [docs/jwb-books.md](docs/jwb-books.md)
 - Music command details: [docs/jwb-music.md](docs/jwb-music.md)
+- Docker runtime and cron configuration: [docs/docker.md](docs/docker.md)
 - Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
@@ -99,6 +118,7 @@ golangci-lint run --timeout=5m
 
 CI and release automation are implemented with GitHub Actions:
 - CI: tests, linting, security scan, binary build checks
+- Docker: multi-arch image build, published to GHCR on version tags (`v*`)
 - Release: multi-platform binaries and archives on `v*` tags
 
 ## Legal
