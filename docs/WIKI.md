@@ -25,6 +25,7 @@ The `jwb-index` command is used to index and download media from jw.org.
 | `--latest` | | `false` | fetch subtitles and videos from the past 31 days up to today (31-day window ending today) |
 | `--limit-rate` | `-R` | `25.0` | maximum download rate, in megabytes/s |
 | `--list-categories` | `-C` | `""` | print a list of (sub) category names |
+| `--metadata` | | `false` | write JSON metadata sidecar files (`<filename>.json`) for all downloaded media |
 | `--mode` | `-m` | `""` | output mode (filesystem, html, m3u, run, stdout, txt) |
 | `--output` | `-o` | `""` | output filename for txt/m3u/html modes |
 | `--no-warning` | | `true` | do not warn when space limit seems wrong |

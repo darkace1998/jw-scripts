@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added `--metadata` flag to `jwb-index`, `jwb-music`, and `jwb-books` that writes a JSON metadata sidecar file (`<filename>.json`) next to every downloaded file. Sidecars include title, category, language, publish date, duration, size, MD5 checksum, subtitle info, and (for publications) publication code, issue, and format.
+- Added new `internal/metadata` package with tests.
+- `jwb-books` now downloads all files of a publication in the requested format (e.g. every MP3 track of an audio publication) instead of only the first one, skips files that are already fully downloaded, and validates MD5 checksums when the API provides them (corrupt downloads are removed).
+
+### Fixed
+- Fixed `--append` being a no-op in `jwb-index` and `jwb-music`: playlist output files (txt/m3u/html) were always overwritten. Append mode now preserves existing entries, deduplicates against them, and keeps a single header/footer. This also fixes `--update`, which implies `--append`.
+- Fixed `--clean-symlinks` being a no-op in filesystem mode: stale symlinks in the data directory (and stale home-category links in the work directory) are now removed before the structure is recreated.
+- Fixed playlist output files being truncated as soon as the writer was created; files are now only written once indexing succeeds, so a failed run no longer destroys an existing playlist.
+- Fixed failed subtitle downloads leaving truncated `.vtt` files behind that were treated as complete on subsequent runs; subtitles are now downloaded to a `.part` file and renamed on success.
+- Fixed playlist entries resolving to `.` instead of the media URL for media items without a local filename.
+- Fixed offline import (`--import`) creating a broken symlink in filesystem mode when `--friendly` was not set.
+- Fixed network-dependent unit tests failing in offline environments; they now skip gracefully when the JW.org API is unreachable.
+
 ## [v1.7.0] - 2026-04-20
 
 ### Added

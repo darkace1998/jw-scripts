@@ -51,6 +51,7 @@ func init() {
 	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of media files from this directory (offline)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
+	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "write JSON metadata sidecar files for all downloaded media")
 	rootCmd.Flags().BoolVarP(&settings.Latest, "latest", "D", false, "fetch subtitles and videos from the past 31 days up to today (31-day window ending today)")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.PrintCategory, "list-categories", "C", "", "print a list of (sub) category names")
@@ -259,9 +260,9 @@ func importOfflineMedia(s *config.Settings) ([]*api.Category, error) {
 			Date:     info.ModTime().Unix(),
 		}
 
-		if s.FriendlyFilenames {
-			media.FriendlyName = entry.Name()
-		}
+		// FriendlyName is used as the symlink name in filesystem mode, so it
+		// must always be set, not only when --friendly is enabled.
+		media.FriendlyName = entry.Name()
 
 		cat.Contents = append(cat.Contents, media)
 	}

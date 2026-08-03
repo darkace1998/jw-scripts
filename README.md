@@ -60,6 +60,9 @@ Indexes and optionally downloads JW Broadcasting media.
 
 # Generate a playlist file
 ./bin/jwb-index --mode txt --output playlist.txt
+
+# Download and write JSON metadata sidecar files for every downloaded file
+./bin/jwb-index --download --metadata
 ```
 
 ### `jwb-music`

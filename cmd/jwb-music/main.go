@@ -72,6 +72,7 @@ func init() {
 	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of music files from this directory (offline)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
+	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "write JSON metadata sidecar files for all downloaded files")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.Mode, "mode", "m", "", "output mode (filesystem, html, m3u, run, stdout, txt)")
 	rootCmd.Flags().StringVarP(&settings.OutputFilename, "output", "o", "", "output filename for txt/m3u/html modes")
@@ -260,9 +261,9 @@ func importOfflineMedia(s *config.Settings) ([]*api.Category, error) {
 			Date:     info.ModTime().Unix(),
 		}
 
-		if s.FriendlyFilenames {
-			media.FriendlyName = entry.Name()
-		}
+		// FriendlyName is used as the symlink name in filesystem mode, so it
+		// must always be set, not only when --friendly is enabled.
+		media.FriendlyName = entry.Name()
 
 		cat.Contents = append(cat.Contents, media)
 	}

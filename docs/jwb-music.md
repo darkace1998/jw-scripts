@@ -46,6 +46,7 @@ jwb-music -L
 | `--languages` | `-L` | `false` | display a list of valid language codes |
 | `--limit-rate` | `-R` | `25.0` | maximum download rate, in megabytes/s |
 | `--list-categories` | | `false` | list all available music categories |
+| `--metadata` | | `false` | write JSON metadata sidecar files (`<filename>.json`) for all downloaded files |
 | `--mode` | `-m` | `""` | output mode (filesystem, html, m3u, run, stdout, txt) |
 | `--output` | `-o` | `""` | output filename for txt/m3u/html modes |
 | `--no-warning` | | `true` | do not warn when space limit seems wrong |

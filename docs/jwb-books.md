@@ -42,6 +42,7 @@ jwb-books --search "daily" --language F
 | `--list-categories` | `false` | List all available categories |
 | `--list-formats` | `false` | List all supported formats |
 | `--list-languages` | `false` | List all supported languages |
+| `--metadata` | `false` | Write JSON metadata sidecar files (`<filename>.json`) for all downloaded files |
 | `--output` | `downloads` | Output directory for downloads |
 | `--search` | `""` | Search for publications |
 

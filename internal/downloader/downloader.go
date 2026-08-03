@@ -15,6 +15,7 @@ import (
 
 	"github.com/darkace1998/jw-scripts/internal/api"
 	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/metadata"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -35,10 +36,12 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 	}
 
 	var mediaList []*api.Media
+	categoryOf := make(map[*api.Media]*api.Category)
 	for _, cat := range data {
 		for _, item := range cat.Contents {
 			if media, ok := item.(*api.Media); ok {
 				mediaList = append(mediaList, media)
+				categoryOf[media] = cat
 			}
 		}
 	}
@@ -53,49 +56,86 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 		}
 	}
 
-	if !s.Download {
-		return nil
-	}
-
-	if s.Quiet < 1 {
-		fmt.Fprintln(os.Stderr, "scanning local files")
-	}
-
-	var downloadList []*api.Media
-	checkedFiles := make(map[string]bool)
-	for _, media := range mediaList {
-		if !checkedFiles[media.Filename] {
-			checkedFiles[media.Filename] = true
-			if !checkMedia(s, media, wd) {
-				downloadList = append(downloadList, media)
-			}
+	if s.Download {
+		if s.Quiet < 1 {
+			fmt.Fprintln(os.Stderr, "scanning local files")
 		}
-	}
 
-	for i, media := range downloadList {
-		if s.KeepFree > 0 {
-			if err := diskCleanup(s, wd, media); err != nil {
-				if err == ErrDiskLimitReached || err == ErrMissingTimestamp {
-					if s.Quiet < 2 {
-						fmt.Fprintf(os.Stderr, "low disk space and missing metadata, skipping: %s\n", media.Name)
-					}
-					continue
+		var downloadList []*api.Media
+		checkedFiles := make(map[string]bool)
+		for _, media := range mediaList {
+			if !checkedFiles[media.Filename] {
+				checkedFiles[media.Filename] = true
+				if !checkMedia(s, media, wd) {
+					downloadList = append(downloadList, media)
 				}
-				return err
 			}
 		}
 
-		if s.Quiet < 2 {
-			fmt.Fprintf(os.Stderr, "[%d/%d] ", i+1, len(downloadList))
-		}
-		if err := downloadMedia(s, media, wd); err != nil {
+		for i, media := range downloadList {
+			if s.KeepFree > 0 {
+				if err := diskCleanup(s, wd, media); err != nil {
+					if err == ErrDiskLimitReached || err == ErrMissingTimestamp {
+						if s.Quiet < 2 {
+							fmt.Fprintf(os.Stderr, "low disk space and missing metadata, skipping: %s\n", media.Name)
+						}
+						continue
+					}
+					return err
+				}
+			}
+
 			if s.Quiet < 2 {
-				fmt.Fprintf(os.Stderr, "download failed for %s: %v\n", media.Name, err)
+				fmt.Fprintf(os.Stderr, "[%d/%d] ", i+1, len(downloadList))
+			}
+			if err := downloadMedia(s, media, wd); err != nil {
+				if s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "download failed for %s: %v\n", media.Name, err)
+				}
 			}
 		}
+	}
+
+	if s.WriteMetadata {
+		writeAllMetadata(s, mediaList, categoryOf, wd)
 	}
 
 	return nil
+}
+
+// writeAllMetadata writes a JSON metadata sidecar file for every media file
+// that exists locally. Sidecars are refreshed on every run so they stay in
+// sync with the API data. Failures are reported but never abort the run.
+func writeAllMetadata(s *config.Settings, mediaList []*api.Media, categoryOf map[*api.Media]*api.Category, directory string) {
+	if s.Quiet < 1 {
+		fmt.Fprintln(os.Stderr, "writing metadata files")
+	}
+
+	written := make(map[string]bool)
+	count := 0
+	for _, media := range mediaList {
+		if media.Filename == "" || written[media.Filename] {
+			continue
+		}
+		written[media.Filename] = true
+
+		if !fileExists(filepath.Join(directory, media.Filename)) {
+			continue
+		}
+
+		meta := metadata.FromMedia(s.Lang, categoryOf[media], media)
+		if err := metadata.Write(directory, media.Filename, meta); err != nil {
+			if s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "failed to write metadata for %s: %v\n", media.Filename, err)
+			}
+			continue
+		}
+		count++
+	}
+
+	if s.Quiet < 1 {
+		fmt.Fprintf(os.Stderr, "wrote %d metadata files\n", count)
+	}
 }
 
 func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory string) error {
@@ -117,16 +157,23 @@ func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory 
 		if s.Quiet < 2 {
 			fmt.Fprintf(os.Stderr, "[%d/%d] downloading: %s\n", i+1, len(queue), media.SubtitleFilename)
 		}
+		// Download to a temporary file and rename on success so a failed
+		// download never leaves a truncated subtitle file behind that would
+		// be treated as complete on the next run.
 		subtitlePath := filepath.Join(directory, media.SubtitleFilename)
-		if err := DownloadFile(media.SubtitleURL, subtitlePath, false, 0); err != nil {
+		tmpPath := subtitlePath + ".part"
+		if err := DownloadFile(media.SubtitleURL, tmpPath, false, 0); err != nil {
 			if s.Quiet < 2 {
 				fmt.Fprintf(os.Stderr, "failed to download subtitle %s: %v\n", media.SubtitleFilename, err)
 			}
-			// Clean up any empty or partial files created during failed download
-			if fi, statErr := os.Stat(subtitlePath); statErr == nil && fi.Size() == 0 {
-				if removeErr := os.Remove(subtitlePath); removeErr != nil && s.Quiet < 2 {
-					fmt.Fprintf(os.Stderr, "failed to clean up empty file %s: %v\n", media.SubtitleFilename, removeErr)
-				}
+			if removeErr := os.Remove(tmpPath); removeErr != nil && !os.IsNotExist(removeErr) && s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "failed to clean up partial file %s: %v\n", tmpPath, removeErr)
+			}
+			continue
+		}
+		if err := os.Rename(tmpPath, subtitlePath); err != nil {
+			if s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "failed to finalize subtitle %s: %v\n", media.SubtitleFilename, err)
 			}
 		}
 	}
