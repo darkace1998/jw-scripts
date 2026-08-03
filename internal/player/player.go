@@ -168,6 +168,7 @@ func (m *VideoManager) setRandomVideo() bool {
 		return false
 	}
 
+	// #nosec G404 - math/rand is fine for shuffling playback order; not security-sensitive
 	rand.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
 
 	for _, vid := range files {

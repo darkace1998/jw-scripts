@@ -268,6 +268,7 @@ func cleanSymlinks(s *config.Settings, dataDir string) error {
 				return err
 			}
 			if d.Type()&os.ModeSymlink != 0 {
+				// #nosec G122 - removing symlinks we created under our own data directory
 				return os.Remove(path)
 			}
 			return nil
@@ -330,6 +331,7 @@ func sortMedia(mediaList []*api.Media, sortKey string) {
 		})
 	case "random":
 		// Use the global random number generator (automatically seeded in Go 1.20+)
+		// #nosec G404 - math/rand is fine for shuffling playlist order; not security-sensitive
 		rand.Shuffle(len(mediaList), func(i, j int) {
 			mediaList[i], mediaList[j] = mediaList[j], mediaList[i]
 		})
