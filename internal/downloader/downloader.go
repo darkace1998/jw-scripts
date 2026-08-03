@@ -15,6 +15,7 @@ import (
 
 	"github.com/darkace1998/jw-scripts/internal/api"
 	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/metadata"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -35,10 +36,12 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 	}
 
 	var mediaList []*api.Media
+	categoryOf := make(map[*api.Media]*api.Category)
 	for _, cat := range data {
 		for _, item := range cat.Contents {
 			if media, ok := item.(*api.Media); ok {
 				mediaList = append(mediaList, media)
+				categoryOf[media] = cat
 			}
 		}
 	}
@@ -53,49 +56,114 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 		}
 	}
 
-	if !s.Download {
-		return nil
-	}
-
-	if s.Quiet < 1 {
-		fmt.Fprintln(os.Stderr, "scanning local files")
-	}
-
-	var downloadList []*api.Media
-	checkedFiles := make(map[string]bool)
-	for _, media := range mediaList {
-		if !checkedFiles[media.Filename] {
-			checkedFiles[media.Filename] = true
-			if !checkMedia(s, media, wd) {
-				downloadList = append(downloadList, media)
+	if s.Download {
+		if s.KeepFree > 0 && s.Warning && s.Quiet < 2 {
+			fmt.Fprintf(os.Stderr, "warning: disk space limit is set: old MP4 files in %s will be DELETED when free space drops below %d MiB (disable this warning with --no-warning)\n",
+				wd, s.KeepFree/(1024*1024))
+			// #nosec G115 - KeepFree is guaranteed positive by the enclosing condition
+			if free, err := getFreeDiskSpace(wd); err == nil && free < uint64(s.KeepFree) {
+				fmt.Fprintf(os.Stderr, "warning: free disk space (%d MiB) is already below the limit (%d MiB); the space limit seems wrong\n",
+					free/(1024*1024), s.KeepFree/(1024*1024))
 			}
 		}
-	}
 
-	for i, media := range downloadList {
-		if s.KeepFree > 0 {
-			if err := diskCleanup(s, wd, media); err != nil {
-				if err == ErrDiskLimitReached || err == ErrMissingTimestamp {
-					if s.Quiet < 2 {
-						fmt.Fprintf(os.Stderr, "low disk space and missing metadata, skipping: %s\n", media.Name)
-					}
-					continue
+		if s.WriteMetadata && s.OverwriteBad && s.Checksums && s.Quiet < 2 {
+			fmt.Fprintln(os.Stderr, "note: checksum verification is skipped for files with embedded metadata (--metadata changes file contents)")
+		}
+
+		if s.Quiet < 1 {
+			fmt.Fprintln(os.Stderr, "scanning local files")
+		}
+
+		var downloadList []*api.Media
+		checkedFiles := make(map[string]bool)
+		for _, media := range mediaList {
+			if !checkedFiles[media.Filename] {
+				checkedFiles[media.Filename] = true
+				if !checkMedia(s, media, wd) {
+					downloadList = append(downloadList, media)
 				}
-				return err
 			}
 		}
 
-		if s.Quiet < 2 {
-			fmt.Fprintf(os.Stderr, "[%d/%d] ", i+1, len(downloadList))
-		}
-		if err := downloadMedia(s, media, wd); err != nil {
+		for i, media := range downloadList {
+			if s.KeepFree > 0 {
+				if err := diskCleanup(s, wd, media); err != nil {
+					if err == ErrDiskLimitReached || err == ErrMissingTimestamp {
+						if s.Quiet < 2 {
+							fmt.Fprintf(os.Stderr, "low disk space and missing metadata, skipping: %s\n", media.Name)
+						}
+						continue
+					}
+					return err
+				}
+			}
+
 			if s.Quiet < 2 {
-				fmt.Fprintf(os.Stderr, "download failed for %s: %v\n", media.Name, err)
+				fmt.Fprintf(os.Stderr, "[%d/%d] ", i+1, len(downloadList))
+			}
+			if err := downloadMedia(s, media, wd); err != nil {
+				if s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "download failed for %s: %v\n", media.Name, err)
+				}
 			}
 		}
+	}
+
+	if s.WriteMetadata {
+		writeAllMetadata(s, mediaList, categoryOf, wd)
 	}
 
 	return nil
+}
+
+// writeAllMetadata embeds metadata into every media file that exists
+// locally (ID3v2 tags for MP3, iTunes-style atoms for MP4). Formats that
+// cannot carry embedded tags, or files that fail to embed, get a JSON
+// sidecar file instead. Embedding is idempotent, so unchanged files are not
+// rewritten on subsequent runs. Failures are reported but never abort the
+// run.
+func writeAllMetadata(s *config.Settings, mediaList []*api.Media, categoryOf map[*api.Media]*api.Category, directory string) {
+	if s.Quiet < 1 {
+		fmt.Fprintln(os.Stderr, "writing metadata")
+	}
+
+	written := make(map[string]bool)
+	count := 0
+	for _, media := range mediaList {
+		if media.Filename == "" || written[media.Filename] {
+			continue
+		}
+		written[media.Filename] = true
+
+		path := filepath.Join(directory, media.Filename)
+		if !fileExists(path) {
+			continue
+		}
+
+		meta := metadata.FromMedia(s.Lang, categoryOf[media], media)
+		if err := metadata.Embed(path, meta); err == nil {
+			// Remove any sidecar left over from earlier versions that wrote
+			// JSON files instead of embedding.
+			_ = os.Remove(metadata.SidecarPath(directory, media.Filename))
+			count++
+		} else {
+			if !errors.Is(err, metadata.ErrUnsupportedFormat) && s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "could not embed metadata in %s: %v; writing sidecar file instead\n", media.Filename, err)
+			}
+			if err := metadata.Write(directory, media.Filename, meta); err != nil {
+				if s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "failed to write metadata for %s: %v\n", media.Filename, err)
+				}
+				continue
+			}
+			count++
+		}
+	}
+
+	if s.Quiet < 1 {
+		fmt.Fprintf(os.Stderr, "wrote metadata for %d files\n", count)
+	}
 }
 
 func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory string) error {
@@ -117,16 +185,23 @@ func downloadAllSubtitles(s *config.Settings, mediaList []*api.Media, directory 
 		if s.Quiet < 2 {
 			fmt.Fprintf(os.Stderr, "[%d/%d] downloading: %s\n", i+1, len(queue), media.SubtitleFilename)
 		}
+		// Download to a temporary file and rename on success so a failed
+		// download never leaves a truncated subtitle file behind that would
+		// be treated as complete on the next run.
 		subtitlePath := filepath.Join(directory, media.SubtitleFilename)
-		if err := DownloadFile(media.SubtitleURL, subtitlePath, false, 0); err != nil {
+		tmpPath := subtitlePath + ".part"
+		if err := DownloadFile(media.SubtitleURL, tmpPath, false, 0); err != nil {
 			if s.Quiet < 2 {
 				fmt.Fprintf(os.Stderr, "failed to download subtitle %s: %v\n", media.SubtitleFilename, err)
 			}
-			// Clean up any empty or partial files created during failed download
-			if fi, statErr := os.Stat(subtitlePath); statErr == nil && fi.Size() == 0 {
-				if removeErr := os.Remove(subtitlePath); removeErr != nil && s.Quiet < 2 {
-					fmt.Fprintf(os.Stderr, "failed to clean up empty file %s: %v\n", media.SubtitleFilename, removeErr)
-				}
+			if removeErr := os.Remove(tmpPath); removeErr != nil && !os.IsNotExist(removeErr) && s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "failed to clean up partial file %s: %v\n", tmpPath, removeErr)
+			}
+			continue
+		}
+		if err := os.Rename(tmpPath, subtitlePath); err != nil {
+			if s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "failed to finalize subtitle %s: %v\n", media.SubtitleFilename, err)
 			}
 		}
 	}
@@ -146,14 +221,28 @@ func checkMedia(s *config.Settings, media *api.Media, directory string) bool {
 			return false
 		}
 
-		if media.Size > 0 && fi.Size() != media.Size {
-			if s.Quiet < 2 {
-				fmt.Fprintf(os.Stderr, "size mismatch: %s\n", file)
+		if media.Size > 0 {
+			if s.WriteMetadata {
+				// Embedded metadata grows files beyond the size reported by
+				// the API, so only treat files smaller than the original
+				// download as broken.
+				if fi.Size() < media.Size {
+					if s.Quiet < 2 {
+						fmt.Fprintf(os.Stderr, "size mismatch: %s\n", file)
+					}
+					return false
+				}
+			} else if fi.Size() != media.Size {
+				if s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "size mismatch: %s\n", file)
+				}
+				return false
 			}
-			return false
 		}
 
-		if s.Checksums && media.MD5 != "" {
+		// Embedded metadata changes the file contents, so the API checksum
+		// can no longer match; skip checksum verification in that case.
+		if s.Checksums && media.MD5 != "" && !s.WriteMetadata {
 			ok, err := CheckMD5(file, media.MD5)
 			if err != nil || !ok {
 				if s.Quiet < 2 {

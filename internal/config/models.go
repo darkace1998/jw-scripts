@@ -36,4 +36,5 @@ type Settings struct {
 	SafeFilenames     bool
 	Sort              string
 	AudioOnly         bool // prefer audio (MP3) files over video (MP4) files
+	WriteMetadata     bool // write JSON metadata sidecar files for downloaded files
 }

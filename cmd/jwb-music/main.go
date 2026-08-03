@@ -18,6 +18,7 @@ import (
 
 var settings = &config.Settings{}
 var sinceDate string
+var noWarning bool
 
 // musicCategories defines all the music-related categories available for download
 var musicCategories = []string{
@@ -72,10 +73,11 @@ func init() {
 	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of music files from this directory (offline)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
+	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "embed metadata in downloaded files (ID3 for MP3, MP4 atoms for video); unsupported formats get a JSON sidecar file")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.Mode, "mode", "m", "", "output mode (filesystem, html, m3u, run, stdout, txt)")
 	rootCmd.Flags().StringVarP(&settings.OutputFilename, "output", "o", "", "output filename for txt/m3u/html modes")
-	rootCmd.Flags().BoolVar(&settings.Warning, "no-warning", true, "do not warn when space limit seems wrong")
+	rootCmd.Flags().BoolVar(&noWarning, "no-warning", false, "do not warn when the disk space limit (--free) seems wrong")
 	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
 	rootCmd.Flags().BoolVar(&settings.SafeFilenames, "safe-filenames", runtime.GOOS == "windows", "use filesystem-safe filenames (automatically enabled on Windows)")
 	rootCmd.Flags().StringVar(&sinceDate, "since", "", "only index music newer than this date (YYYY-MM-DD)")
@@ -91,6 +93,8 @@ func main() {
 }
 
 func run(s *config.Settings) error {
+	s.Warning = !noWarning
+
 	client := api.NewClient(s)
 
 	if s.ListLanguages {
@@ -260,9 +264,9 @@ func importOfflineMedia(s *config.Settings) ([]*api.Category, error) {
 			Date:     info.ModTime().Unix(),
 		}
 
-		if s.FriendlyFilenames {
-			media.FriendlyName = entry.Name()
-		}
+		// FriendlyName is used as the symlink name in filesystem mode, so it
+		// must always be set, not only when --friendly is enabled.
+		media.FriendlyName = entry.Name()
 
 		cat.Contents = append(cat.Contents, media)
 	}

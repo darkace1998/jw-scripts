@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added `--metadata` flag to `jwb-index`, `jwb-music`, and `jwb-books` that embeds metadata directly in downloaded media files: ID3v2.4 tags for MP3 (title, album/category, artist, date, source URL) and iTunes-style metadata atoms for MP4 (with correct chunk-offset patching for faststart files). Formats that cannot carry embedded tags (PDF, EPUB, RTF, BRL) get a JSON sidecar file (`<filename>.json`) instead. Embedding is idempotent (unchanged files are not rewritten), preserves file modification times, and stale sidecars from earlier runs are cleaned up once metadata is embedded.
+- Added new `internal/metadata` package (JSON sidecars, ID3v2.4 writer, MP4 atom writer) with tests.
+- Implemented the disk-space warning for `--free` in `jwb-index` and `jwb-music`: a notice that old MP4 files will be deleted when space runs low, plus a warning when free space is already below the configured limit. The previously broken `--no-warning` flag (default was `true` and the setting was never read) now actually suppresses these warnings.
+- `jwb-books` now downloads all files of a publication in the requested format (e.g. every MP3 track of an audio publication) instead of only the first one, skips files that are already fully downloaded, and validates MD5 checksums when the API provides them (corrupt downloads are removed).
+
+### Changed
+- With `--metadata` enabled, `--fix-broken` size checks accept files that grew due to embedded tags, and checksum verification is skipped for such files (embedding changes the file contents, so the API checksum can no longer match).
+
+### Fixed
+- Fixed `--append` being a no-op in `jwb-index` and `jwb-music`: playlist output files (txt/m3u/html) were always overwritten. Append mode now preserves existing entries, deduplicates against them, and keeps a single header/footer. This also fixes `--update`, which implies `--append`.
+- Fixed `--clean-symlinks` being a no-op in filesystem mode: stale symlinks in the data directory (and stale home-category links in the work directory) are now removed before the structure is recreated.
+- Fixed playlist output files being truncated as soon as the writer was created; files are now only written once indexing succeeds, so a failed run no longer destroys an existing playlist.
+- Fixed failed subtitle downloads leaving truncated `.vtt` files behind that were treated as complete on subsequent runs; subtitles are now downloaded to a `.part` file and renamed on success.
+- Fixed playlist entries resolving to `.` instead of the media URL for media items without a local filename.
+- Fixed offline import (`--import`) creating a broken symlink in filesystem mode when `--friendly` was not set.
+- Fixed network-dependent unit tests failing in offline environments; they now skip gracefully when the JW.org API is unreachable.
+
 ## [v1.7.0] - 2026-04-20
 
 ### Added

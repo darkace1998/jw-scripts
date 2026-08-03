@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -38,6 +39,21 @@ func CreateOutput(s *config.Settings, data []*api.Category) error {
 		s.OutputFilename = fmt.Sprintf("playlist.%s", getDefaultExtension(s.Mode))
 	}
 
+	if strings.HasSuffix(s.Mode, "multi") || strings.HasSuffix(s.Mode, "tree") {
+		return outputMulti(s, data)
+	}
+
+	writer, err := newWriter(s)
+	if err != nil {
+		return err
+	}
+	return outputSingle(s, data, writer)
+}
+
+// newWriter constructs the writer for the configured mode. When --append is
+// requested, existing file content is loaded so old entries are preserved and
+// deduplicated against new ones.
+func newWriter(s *config.Settings) (Writer, error) {
 	var writer Writer
 	var err error
 
@@ -53,17 +69,21 @@ func CreateOutput(s *config.Settings, data []*api.Category) error {
 	case s.Mode == "run":
 		writer = NewCommandWriter(s)
 	default:
-		return fmt.Errorf("unknown mode: %s", s.Mode)
+		return nil, fmt.Errorf("unknown mode: %s", s.Mode)
 	}
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if strings.HasSuffix(s.Mode, "multi") || strings.HasSuffix(s.Mode, "tree") {
-		return outputMulti(s, data, writer)
+	if s.Append {
+		if a, ok := writer.(interface{ LoadExisting() error }); ok {
+			if err := a.LoadExisting(); err != nil {
+				return nil, err
+			}
+		}
 	}
-	return outputSingle(s, data, writer)
+
+	return writer, nil
 }
 
 func requiresOutputFilename(mode string) bool {
@@ -85,7 +105,7 @@ func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error
 
 	for _, media := range allMedia {
 		source := media.URL
-		if fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
+		if media.Filename != "" && fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
 			source = filepath.Join(".", s.SubDir, media.Filename)
 		}
 		writer.Add(PlaylistEntry{
@@ -98,7 +118,7 @@ func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error
 	return writer.Dump()
 }
 
-func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error {
+func outputMulti(s *config.Settings, data []*api.Category) error {
 	originalFilename := s.OutputFilename
 	defer func() { s.OutputFilename = originalFilename }()
 
@@ -131,28 +151,14 @@ func outputMulti(s *config.Settings, data []*api.Category, writer Writer) error 
 		}
 
 		// Create new writer for this category
-		var categoryWriter Writer
-		var err error
-
-		switch {
-		case strings.HasPrefix(s.Mode, "txt"):
-			categoryWriter, err = NewTxtWriter(s)
-		case strings.HasPrefix(s.Mode, "m3u"):
-			categoryWriter, err = NewM3uWriter(s)
-		case strings.HasPrefix(s.Mode, "html"):
-			categoryWriter, err = NewHTMLWriter(s)
-		default:
-			// For stdout and run modes, we can't really do "multi" so just use single output
-			return outputSingle(s, data, writer)
-		}
-
+		categoryWriter, err := newWriter(s)
 		if err != nil {
 			return err
 		}
 
 		for _, media := range categoryMedia {
 			source := media.URL
-			if fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
+			if media.Filename != "" && fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
 				source = filepath.Join(".", s.SubDir, media.Filename)
 			}
 			categoryWriter.Add(PlaylistEntry{
@@ -187,6 +193,12 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 	dataDir := filepath.Join(s.WorkDir, s.SubDir)
 	if s.Quiet < 1 {
 		fmt.Fprintln(os.Stderr, "creating directory structure")
+	}
+
+	if s.CleanAllSymlinks {
+		if err := cleanSymlinks(s, dataDir); err != nil {
+			return err
+		}
 	}
 
 	for _, category := range data {
@@ -241,6 +253,69 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 	return nil
 }
 
+// cleanSymlinks removes all symlinks below the data directory as well as
+// top-level symlinks in the work directory that point into the data
+// directory. This implements the --clean-symlinks flag so stale links from
+// previous runs (renamed categories, removed media) do not accumulate.
+func cleanSymlinks(s *config.Settings, dataDir string) error {
+	if s.Quiet < 1 {
+		fmt.Fprintln(os.Stderr, "removing old symlinks")
+	}
+
+	if fileExists(dataDir) {
+		err := filepath.WalkDir(dataDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.Type()&os.ModeSymlink != 0 {
+				// #nosec G122 - removing symlinks we created under our own data directory
+				return os.Remove(path)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Home-category symlinks are created at the top level of the work
+	// directory; only remove the ones that point into our data directory.
+	entries, err := os.ReadDir(s.WorkDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.Type()&os.ModeSymlink == 0 {
+			continue
+		}
+		linkPath := filepath.Join(s.WorkDir, entry.Name())
+		target, err := os.Readlink(linkPath)
+		if err != nil {
+			continue
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(s.WorkDir, target)
+		}
+		absTarget, err := filepath.Abs(target)
+		if err != nil {
+			continue
+		}
+		absDataDir, err := filepath.Abs(dataDir)
+		if err != nil {
+			continue
+		}
+		if absTarget == absDataDir || strings.HasPrefix(absTarget, absDataDir+string(os.PathSeparator)) {
+			if err := os.Remove(linkPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func sortMedia(mediaList []*api.Media, sortKey string) {
 	switch sortKey {
 	case "name":
@@ -256,6 +331,7 @@ func sortMedia(mediaList []*api.Media, sortKey string) {
 		})
 	case "random":
 		// Use the global random number generator (automatically seeded in Go 1.20+)
+		// #nosec G404 - math/rand is fine for shuffling playlist order; not security-sensitive
 		rand.Shuffle(len(mediaList), func(i, j int) {
 			mediaList[i], mediaList[j] = mediaList[j], mediaList[i]
 		})
@@ -269,15 +345,20 @@ func fileExists(path string) bool {
 
 // --- TxtWriter ---
 
+// hrefRegex extracts the href attribute from HTML anchor lines when loading
+// an existing HTML playlist in append mode.
+var hrefRegex = regexp.MustCompile(`href="([^"]*)"`)
+
 // TxtWriter handles writing playlist entries to a text file
 type TxtWriter struct {
-	s         *config.Settings
-	file      *os.File
-	queue     []PlaylistEntry
-	history   map[string]bool
-	start     string
-	end       string
-	formatter func(PlaylistEntry) string
+	s            *config.Settings
+	path         string
+	queue        []PlaylistEntry
+	history      map[string]bool
+	existingBody string
+	start        string
+	end          string
+	formatter    func(PlaylistEntry) string
 }
 
 // NewTxtWriter creates a new TxtWriter instance for writing playlist entries to a text file
@@ -305,20 +386,45 @@ func NewTxtWriter(s *config.Settings) (*TxtWriter, error) {
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return nil, fmt.Errorf("invalid output filename: path traversal detected in %s", filename)
 	}
-	// #nosec G304 - Path is user-configured output file for legitimate file operations
-	file, err := os.Create(cleanPath)
-	if err != nil {
-		return nil, err
-	}
 
 	return &TxtWriter{
 		s:       s,
-		file:    file,
+		path:    cleanPath,
 		history: make(map[string]bool),
 		formatter: func(e PlaylistEntry) string {
 			return e.Source
 		},
 	}, nil
+}
+
+// LoadExisting reads an already existing output file so that its entries are
+// kept and not duplicated when new entries are appended (--append).
+func (w *TxtWriter) LoadExisting() error {
+	// #nosec G304 - Path is user-configured output file for legitimate file operations
+	data, err := os.ReadFile(w.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	body := strings.TrimPrefix(string(data), w.start)
+	body = strings.TrimSuffix(body, w.end)
+	w.existingBody = body
+
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if m := hrefRegex.FindStringSubmatch(line); m != nil {
+			w.history[html.UnescapeString(m[1])] = true
+			continue
+		}
+		w.history[line] = true
+	}
+	return nil
 }
 
 // Add adds a playlist entry to the writer's queue
@@ -329,20 +435,31 @@ func (w *TxtWriter) Add(entry PlaylistEntry) {
 	}
 }
 
-// Dump writes all queued playlist entries to the output file
+// Dump writes the existing (appended) content plus all queued playlist
+// entries to the output file. The file is only created/replaced here, so a
+// failed indexing run never truncates a previously written playlist.
 func (w *TxtWriter) Dump() error {
-	defer func() { _ = w.file.Close() }()
-	if _, err := w.file.WriteString(w.start); err != nil {
+	// #nosec G304 - Path is user-configured output file for legitimate file operations
+	file, err := os.Create(w.path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+
+	if _, err := file.WriteString(w.start); err != nil {
+		return err
+	}
+	if _, err := file.WriteString(w.existingBody); err != nil {
 		return err
 	}
 
 	for _, entry := range w.queue {
-		if _, err := w.file.WriteString(w.formatter(entry) + "\n"); err != nil {
+		if _, err := file.WriteString(w.formatter(entry) + "\n"); err != nil {
 			return err
 		}
 	}
 
-	if _, err := w.file.WriteString(w.end); err != nil {
+	if _, err := file.WriteString(w.end); err != nil {
 		return err
 	}
 	return nil
