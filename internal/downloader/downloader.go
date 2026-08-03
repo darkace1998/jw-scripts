@@ -57,6 +57,20 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 	}
 
 	if s.Download {
+		if s.KeepFree > 0 && s.Warning && s.Quiet < 2 {
+			fmt.Fprintf(os.Stderr, "warning: disk space limit is set: old MP4 files in %s will be DELETED when free space drops below %d MiB (disable this warning with --no-warning)\n",
+				wd, s.KeepFree/(1024*1024))
+			// #nosec G115 - KeepFree is guaranteed positive by the enclosing condition
+			if free, err := getFreeDiskSpace(wd); err == nil && free < uint64(s.KeepFree) {
+				fmt.Fprintf(os.Stderr, "warning: free disk space (%d MiB) is already below the limit (%d MiB); the space limit seems wrong\n",
+					free/(1024*1024), s.KeepFree/(1024*1024))
+			}
+		}
+
+		if s.WriteMetadata && s.OverwriteBad && s.Checksums && s.Quiet < 2 {
+			fmt.Fprintln(os.Stderr, "note: checksum verification is skipped for files with embedded metadata (--metadata changes file contents)")
+		}
+
 		if s.Quiet < 1 {
 			fmt.Fprintln(os.Stderr, "scanning local files")
 		}
@@ -103,12 +117,15 @@ func DownloadAll(s *config.Settings, data []*api.Category) error {
 	return nil
 }
 
-// writeAllMetadata writes a JSON metadata sidecar file for every media file
-// that exists locally. Sidecars are refreshed on every run so they stay in
-// sync with the API data. Failures are reported but never abort the run.
+// writeAllMetadata embeds metadata into every media file that exists
+// locally (ID3v2 tags for MP3, iTunes-style atoms for MP4). Formats that
+// cannot carry embedded tags, or files that fail to embed, get a JSON
+// sidecar file instead. Embedding is idempotent, so unchanged files are not
+// rewritten on subsequent runs. Failures are reported but never abort the
+// run.
 func writeAllMetadata(s *config.Settings, mediaList []*api.Media, categoryOf map[*api.Media]*api.Category, directory string) {
 	if s.Quiet < 1 {
-		fmt.Fprintln(os.Stderr, "writing metadata files")
+		fmt.Fprintln(os.Stderr, "writing metadata")
 	}
 
 	written := make(map[string]bool)
@@ -119,22 +136,33 @@ func writeAllMetadata(s *config.Settings, mediaList []*api.Media, categoryOf map
 		}
 		written[media.Filename] = true
 
-		if !fileExists(filepath.Join(directory, media.Filename)) {
+		path := filepath.Join(directory, media.Filename)
+		if !fileExists(path) {
 			continue
 		}
 
 		meta := metadata.FromMedia(s.Lang, categoryOf[media], media)
-		if err := metadata.Write(directory, media.Filename, meta); err != nil {
-			if s.Quiet < 2 {
-				fmt.Fprintf(os.Stderr, "failed to write metadata for %s: %v\n", media.Filename, err)
+		if err := metadata.Embed(path, meta); err == nil {
+			// Remove any sidecar left over from earlier versions that wrote
+			// JSON files instead of embedding.
+			_ = os.Remove(metadata.SidecarPath(directory, media.Filename))
+			count++
+		} else {
+			if !errors.Is(err, metadata.ErrUnsupportedFormat) && s.Quiet < 2 {
+				fmt.Fprintf(os.Stderr, "could not embed metadata in %s: %v; writing sidecar file instead\n", media.Filename, err)
 			}
-			continue
+			if err := metadata.Write(directory, media.Filename, meta); err != nil {
+				if s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "failed to write metadata for %s: %v\n", media.Filename, err)
+				}
+				continue
+			}
+			count++
 		}
-		count++
 	}
 
 	if s.Quiet < 1 {
-		fmt.Fprintf(os.Stderr, "wrote %d metadata files\n", count)
+		fmt.Fprintf(os.Stderr, "wrote metadata for %d files\n", count)
 	}
 }
 
@@ -193,14 +221,28 @@ func checkMedia(s *config.Settings, media *api.Media, directory string) bool {
 			return false
 		}
 
-		if media.Size > 0 && fi.Size() != media.Size {
-			if s.Quiet < 2 {
-				fmt.Fprintf(os.Stderr, "size mismatch: %s\n", file)
+		if media.Size > 0 {
+			if s.WriteMetadata {
+				// Embedded metadata grows files beyond the size reported by
+				// the API, so only treat files smaller than the original
+				// download as broken.
+				if fi.Size() < media.Size {
+					if s.Quiet < 2 {
+						fmt.Fprintf(os.Stderr, "size mismatch: %s\n", file)
+					}
+					return false
+				}
+			} else if fi.Size() != media.Size {
+				if s.Quiet < 2 {
+					fmt.Fprintf(os.Stderr, "size mismatch: %s\n", file)
+				}
+				return false
 			}
-			return false
 		}
 
-		if s.Checksums && media.MD5 != "" {
+		// Embedded metadata changes the file contents, so the API checksum
+		// can no longer match; skip checksum verification in that case.
+		if s.Checksums && media.MD5 != "" && !s.WriteMetadata {
 			ok, err := CheckMD5(file, media.MD5)
 			if err != nil || !ok {
 				if s.Quiet < 2 {

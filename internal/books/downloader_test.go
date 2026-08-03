@@ -1,6 +1,7 @@
 package books
 
 import (
+	"bytes"
 	"crypto/md5" // #nosec G501 - MD5 used for test checksums matching the API format
 	"encoding/hex"
 	"encoding/json"
@@ -92,7 +93,8 @@ func TestDownloadBookChecksumMismatchRemovesFile(t *testing.T) {
 	}
 }
 
-func TestDownloadBookWritesMetadata(t *testing.T) {
+// PDF cannot carry embedded tags, so metadata falls back to a JSON sidecar.
+func TestDownloadBookWritesSidecarForUnsupportedFormat(t *testing.T) {
 	server := newTestServer(t, map[string]string{
 		"/pub.pdf": "pdf-bytes",
 	})
@@ -135,6 +137,47 @@ func TestDownloadBookWritesMetadata(t *testing.T) {
 		if got, _ := meta[key].(string); got != want {
 			t.Errorf("metadata %s: expected %q, got %q", key, want, got)
 		}
+	}
+}
+
+func TestDownloadBookEmbedsMetadataInMP3(t *testing.T) {
+	audio := "\xff\xfbAUDIO-DATA"
+	server := newTestServer(t, map[string]string{
+		"/track.mp3": audio,
+	})
+
+	book := &Book{
+		ID:       "sjjm",
+		Title:    "Sing Out Joyfully",
+		Language: "E",
+		Files: []BookFile{
+			{Format: FormatMP3, URL: server.URL + "/track.mp3", Filename: "track.mp3", Title: "Song 1", Size: int64(len(audio))},
+		},
+	}
+
+	dir := t.TempDir()
+	d := NewDownloader(&config.Settings{Quiet: 2, WriteMetadata: true})
+
+	if err := d.DownloadBook(book, FormatMP3, dir); err != nil {
+		t.Fatalf("DownloadBook() returned error: %v", err)
+	}
+
+	// #nosec G304 - path is constrained to t.TempDir() in this test
+	content, err := os.ReadFile(filepath.Join(dir, "track.mp3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(content, []byte("ID3")) {
+		t.Error("expected MP3 to start with an embedded ID3 tag")
+	}
+	if !bytes.Contains(content, []byte("Song 1")) {
+		t.Error("expected embedded file title in tag")
+	}
+	if !bytes.HasSuffix(content, []byte(audio)) {
+		t.Error("expected audio data to be preserved")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "track.mp3.json")); !os.IsNotExist(err) {
+		t.Error("did not expect a sidecar for a successfully embedded MP3")
 	}
 }
 

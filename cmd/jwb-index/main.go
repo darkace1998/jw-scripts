@@ -18,6 +18,7 @@ import (
 
 var settings = &config.Settings{}
 var sinceDate string
+var noWarning bool
 
 var rootCmd = &cobra.Command{
 	Use:   "jwb-index",
@@ -51,13 +52,13 @@ func init() {
 	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of media files from this directory (offline)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
-	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "write JSON metadata sidecar files for all downloaded media")
+	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "embed metadata in downloaded media files (ID3 for MP3, MP4 atoms for video); unsupported formats get a JSON sidecar file")
 	rootCmd.Flags().BoolVarP(&settings.Latest, "latest", "D", false, "fetch subtitles and videos from the past 31 days up to today (31-day window ending today)")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.PrintCategory, "list-categories", "C", "", "print a list of (sub) category names")
 	rootCmd.Flags().StringVarP(&settings.Mode, "mode", "m", "", "output mode (filesystem, html, m3u, run, stdout, txt)")
 	rootCmd.Flags().StringVarP(&settings.OutputFilename, "output", "o", "", "output filename for txt/m3u/html modes")
-	rootCmd.Flags().BoolVar(&settings.Warning, "no-warning", true, "do not warn when space limit seems wrong")
+	rootCmd.Flags().BoolVar(&noWarning, "no-warning", false, "do not warn when the disk space limit (--free) seems wrong")
 	rootCmd.Flags().IntVarP(&settings.Quality, "quality", "Q", 720, "maximum video quality")
 	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
 	rootCmd.Flags().BoolVar(&settings.SafeFilenames, "safe-filenames", runtime.GOOS == "windows", "use filesystem-safe filenames (automatically enabled on Windows)")
@@ -74,6 +75,8 @@ func main() {
 }
 
 func run(s *config.Settings) error {
+	s.Warning = !noWarning
+
 	client := api.NewClient(s)
 
 	if s.ListLanguages {

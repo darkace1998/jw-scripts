@@ -22,7 +22,7 @@ func main() {
 		format         = flag.String("format", "pdf", "Format to download (use --list-formats to see options)")
 		search         = flag.String("search", "", "Search for publications")
 		outputDir      = flag.String("output", "downloads", "Output directory for downloads")
-		writeMetadata  = flag.Bool("metadata", false, "Write JSON metadata sidecar files for all downloaded files")
+		writeMetadata  = flag.Bool("metadata", false, "Embed metadata in downloaded MP3/MP4 files; other formats get a JSON sidecar file")
 		help           = flag.Bool("help", false, "Show help information")
 	)
 
@@ -92,7 +92,7 @@ func printHelp() {
 	fmt.Println("  --format FORMAT       Format to download (default: pdf)")
 	fmt.Println("  --search QUERY        Search for publications")
 	fmt.Println("  --output DIR          Output directory (default: downloads)")
-	fmt.Println("  --metadata            Write JSON metadata sidecar files for downloads")
+	fmt.Println("  --metadata            Embed metadata in MP3/MP4 downloads (JSON sidecar for other formats)")
 	fmt.Println("  --help                Show this help message")
 	fmt.Println()
 	fmt.Println("Examples:")

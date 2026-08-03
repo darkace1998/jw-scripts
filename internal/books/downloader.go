@@ -82,12 +82,18 @@ func (d *Downloader) downloadBookFile(book *Book, targetFile *BookFile, format B
 	}
 	outputPath := filepath.Join(outputDir, filename)
 
-	// Skip files that are already fully downloaded
-	if fi, err := os.Stat(outputPath); err == nil && targetFile.Size > 0 && fi.Size() == targetFile.Size {
-		if d.settings.Quiet < 1 {
-			fmt.Printf("Already downloaded: %s\n", outputPath)
+	// Skip files that are already fully downloaded. With embedded metadata
+	// enabled, files grow beyond the size reported by the API, so anything
+	// at least as large as the original download counts as complete.
+	if fi, err := os.Stat(outputPath); err == nil && targetFile.Size > 0 {
+		complete := fi.Size() == targetFile.Size ||
+			(d.settings.WriteMetadata && fi.Size() > targetFile.Size)
+		if complete {
+			if d.settings.Quiet < 1 {
+				fmt.Printf("Already downloaded: %s\n", outputPath)
+			}
+			return d.writeMetadataIfEnabled(book, targetFile, outputDir, filename)
 		}
-		return d.writeMetadataIfEnabled(book, targetFile, outputDir, filename)
 	}
 
 	if d.settings.Quiet < 1 {
@@ -110,8 +116,9 @@ func (d *Downloader) downloadBookFile(book *Book, targetFile *BookFile, format B
 	return d.writeMetadataIfEnabled(book, targetFile, outputDir, filename)
 }
 
-// writeMetadataIfEnabled writes a JSON metadata sidecar for a downloaded
-// book file when metadata generation is enabled.
+// writeMetadataIfEnabled embeds metadata into a downloaded book file when
+// metadata generation is enabled (MP3/MP4). Formats that cannot carry
+// embedded tags, or files that fail to embed, get a JSON sidecar instead.
 func (d *Downloader) writeMetadataIfEnabled(book *Book, targetFile *BookFile, outputDir, filename string) error {
 	if !d.settings.WriteMetadata {
 		return nil
@@ -131,6 +138,17 @@ func (d *Downloader) writeMetadataIfEnabled(book *Book, targetFile *BookFile, ou
 		Format:      string(targetFile.Format),
 		Publication: book.ID,
 		Issue:       book.Issue,
+	}
+
+	err := metadata.Embed(filepath.Join(outputDir, filename), meta)
+	if err == nil {
+		// Remove any sidecar left over from earlier versions that wrote
+		// JSON files instead of embedding.
+		_ = os.Remove(metadata.SidecarPath(outputDir, filename))
+		return nil
+	}
+	if !errors.Is(err, metadata.ErrUnsupportedFormat) && d.settings.Quiet < 2 {
+		fmt.Printf("Could not embed metadata in %s: %v; writing sidecar file instead\n", filename, err)
 	}
 	if err := metadata.Write(outputDir, filename, meta); err != nil {
 		return fmt.Errorf("failed to write metadata for %s: %w", filename, err)

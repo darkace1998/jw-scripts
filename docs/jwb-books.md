@@ -42,7 +42,7 @@ jwb-books --search "daily" --language F
 | `--list-categories` | `false` | List all available categories |
 | `--list-formats` | `false` | List all supported formats |
 | `--list-languages` | `false` | List all supported languages |
-| `--metadata` | `false` | Write JSON metadata sidecar files (`<filename>.json`) for all downloaded files |
+| `--metadata` | `false` | Embed metadata in downloaded MP3/MP4 files; other formats (PDF, EPUB, ...) get a JSON sidecar file (`<filename>.json`) |
 | `--output` | `downloads` | Output directory for downloads |
 | `--search` | `""` | Search for publications |
 
