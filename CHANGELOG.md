@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.7.1] - 2026-08-04
 
 ### Added
 - Added `--metadata` flag to `jwb-index`, `jwb-music`, and `jwb-books` that embeds metadata directly in downloaded media files: ID3v2.4 tags for MP3 (title, album/category, artist, date, source URL) and iTunes-style metadata atoms for MP4 (with correct chunk-offset patching for faststart files). Formats that cannot carry embedded tags (PDF, EPUB, RTF, BRL) get a JSON sidecar file (`<filename>.json`) instead. Embedding is idempotent (unchanged files are not rewritten), preserves file modification times, and stale sidecars from earlier runs are cleaned up once metadata is embedded.
