@@ -2,6 +2,7 @@
 package output
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"math"
@@ -30,8 +31,26 @@ type Writer interface {
 	Dump() error
 }
 
+// ValidateMode checks that mode is a known output mode, so a typo is
+// reported before indexing and downloading start.
+func ValidateMode(mode string) error {
+	switch mode {
+	case "", "filesystem", "stdout", "run":
+		return nil
+	}
+	for _, prefix := range []string{"txt", "m3u", "html"} {
+		if rest, ok := strings.CutPrefix(mode, prefix); ok && (rest == "" || rest == "multi" || rest == "tree") {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown mode: %s (valid modes: filesystem, html, m3u, run, stdout, txt; add \"multi\" to html/m3u/txt for one file per category)", mode)
+}
+
 // CreateOutput creates the output based on the settings.
 func CreateOutput(s *config.Settings, data []*api.Category) error {
+	if err := ValidateMode(s.Mode); err != nil {
+		return err
+	}
 	if s.Mode == "filesystem" {
 		return outputFilesystem(s, data)
 	}
@@ -86,6 +105,12 @@ func newWriter(s *config.Settings) (Writer, error) {
 	return writer, nil
 }
 
+// WritesPlaylistFile reports whether mode writes playlist files (txt, m3u,
+// html and their multi variants).
+func WritesPlaylistFile(mode string) bool {
+	return requiresOutputFilename(mode)
+}
+
 func requiresOutputFilename(mode string) bool {
 	return strings.HasPrefix(mode, "txt") ||
 		strings.HasPrefix(mode, "m3u") ||
@@ -104,18 +129,32 @@ func outputSingle(s *config.Settings, data []*api.Category, writer Writer) error
 	sortMedia(allMedia, s.Sort)
 
 	for _, media := range allMedia {
-		source := media.URL
-		if media.Filename != "" && fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
-			source = filepath.Join(".", s.SubDir, media.Filename)
-		}
 		writer.Add(PlaylistEntry{
 			Name:     media.Name,
-			Source:   source,
+			Source:   mediaSource(s, media),
 			Duration: int(math.Round(media.Duration)),
 		})
 	}
 
 	return writer.Dump()
+}
+
+// mediaSource returns the playlist location of a media item: the local file,
+// relative to the directory of the playlist file, when it has been
+// downloaded, and the URL otherwise.
+func mediaSource(s *config.Settings, media *api.Media) string {
+	if media.Filename == "" {
+		return media.URL
+	}
+	local := filepath.Join(s.WorkDir, s.SubDir, media.Filename)
+	if !fileExists(local) {
+		return media.URL
+	}
+	playlistDir := filepath.Dir(filepath.Join(s.WorkDir, s.OutputFilename))
+	if rel, err := filepath.Rel(playlistDir, local); err == nil {
+		return rel
+	}
+	return local
 }
 
 func outputMulti(s *config.Settings, data []*api.Category) error {
@@ -134,8 +173,9 @@ func outputMulti(s *config.Settings, data []*api.Category) error {
 			continue
 		}
 
-		// Skip categories with empty keys to avoid invalid filenames
-		if category.Key == "" {
+		// Skip categories without a usable key to avoid invalid filenames
+		key := api.FormatFilename(category.Key, true)
+		if key == "" {
 			continue
 		}
 
@@ -143,11 +183,11 @@ func outputMulti(s *config.Settings, data []*api.Category) error {
 
 		// Create separate output file for each category
 		if originalFilename == "" {
-			s.OutputFilename = fmt.Sprintf("%s.%s", category.Key, getDefaultExtension(s.Mode))
+			s.OutputFilename = fmt.Sprintf("%s.%s", key, getDefaultExtension(s.Mode))
 		} else {
 			ext := filepath.Ext(originalFilename)
 			base := strings.TrimSuffix(originalFilename, ext)
-			s.OutputFilename = fmt.Sprintf("%s_%s%s", base, category.Key, ext)
+			s.OutputFilename = fmt.Sprintf("%s_%s%s", base, key, ext)
 		}
 
 		// Create new writer for this category
@@ -157,13 +197,9 @@ func outputMulti(s *config.Settings, data []*api.Category) error {
 		}
 
 		for _, media := range categoryMedia {
-			source := media.URL
-			if media.Filename != "" && fileExists(filepath.Join(s.WorkDir, s.SubDir, media.Filename)) {
-				source = filepath.Join(".", s.SubDir, media.Filename)
-			}
 			categoryWriter.Add(PlaylistEntry{
 				Name:     media.Name,
-				Source:   source,
+				Source:   mediaSource(s, media),
 				Duration: int(math.Round(media.Duration)),
 			})
 		}
@@ -189,6 +225,27 @@ func getDefaultExtension(mode string) string {
 	}
 }
 
+// linkName turns an API name into a single, safe path element for a
+// symlink, falling back to the category key when the name is unusable.
+func linkName(s *config.Settings, name, fallback string) string {
+	if n := api.FormatFilename(name, s.SafeFilenames); n != "" {
+		return n
+	}
+	return api.FormatFilename(fallback, true)
+}
+
+// symlink creates a symlink unless one already exists at linkPath.
+func symlink(target, linkPath string) error {
+	if err := os.Symlink(target, linkPath); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to create symlink %s -> %s: %w", linkPath, target, err)
+	}
+	return nil
+}
+
+// outputFilesystem builds a browsable directory tree of symlinks. Names come
+// from the API and are sanitized so they always stay inside the work
+// directory. A failing link does not stop the others; all failures are
+// returned together.
 func outputFilesystem(s *config.Settings, data []*api.Category) error {
 	dataDir := filepath.Join(s.WorkDir, s.SubDir)
 	if s.Quiet < 1 {
@@ -201,56 +258,72 @@ func outputFilesystem(s *config.Settings, data []*api.Category) error {
 		}
 	}
 
+	var errs []error
 	for _, category := range data {
-		catDir := filepath.Join(dataDir, category.Key)
-		if err := os.MkdirAll(catDir, 0o750); err != nil {
+		key := api.FormatFilename(category.Key, true)
+		if key == "" {
+			continue
+		}
+		catDir := filepath.Join(dataDir, key)
+		// #nosec G301 - media library directories must be readable by media servers
+		if err := os.MkdirAll(catDir, 0o755); err != nil {
 			return err
 		}
 
 		if category.Home {
 			// Create symlink for home categories
-			linkPath := filepath.Join(s.WorkDir, category.Name)
 			targetPath, err := filepath.Rel(s.WorkDir, catDir)
 			if err != nil {
 				return err
 			}
-			if err := os.Symlink(targetPath, linkPath); err != nil && !os.IsExist(err) {
-				return fmt.Errorf("failed to create symlink %s -> %s: %w", linkPath, targetPath, err)
+			linkPath := filepath.Join(s.WorkDir, linkName(s, category.Name, key))
+			if err := symlink(targetPath, linkPath); err != nil {
+				errs = append(errs, err)
 			}
 		}
 
 		for _, item := range category.Contents {
 			switch v := item.(type) {
 			case *api.Category:
-				linkDest := filepath.Join(dataDir, v.Key)
-				if err := os.MkdirAll(linkDest, 0o750); err != nil {
+				subKey := api.FormatFilename(v.Key, true)
+				if subKey == "" {
+					continue
+				}
+				linkDest := filepath.Join(dataDir, subKey)
+				// #nosec G301 - media library directories must be readable by media servers
+				if err := os.MkdirAll(linkDest, 0o755); err != nil {
 					return err
 				}
-				linkFile := filepath.Join(catDir, v.Name)
 				targetPath, err := filepath.Rel(catDir, linkDest)
 				if err != nil {
 					return err
 				}
-				if err := os.Symlink(targetPath, linkFile); err != nil && !os.IsExist(err) {
-					return fmt.Errorf("failed to create symlink %s -> %s: %w", linkFile, targetPath, err)
+				if err := symlink(targetPath, filepath.Join(catDir, linkName(s, v.Name, subKey))); err != nil {
+					errs = append(errs, err)
 				}
 			case *api.Media:
+				if v.Filename == "" {
+					continue
+				}
 				linkDest := filepath.Join(dataDir, v.Filename)
 				if !fileExists(linkDest) {
 					continue
 				}
-				linkFile := filepath.Join(catDir, v.FriendlyName)
+				name := api.FormatFilename(v.FriendlyName, s.SafeFilenames)
+				if name == "" {
+					name = v.Filename
+				}
 				targetPath, err := filepath.Rel(catDir, linkDest)
 				if err != nil {
 					return err
 				}
-				if err := os.Symlink(targetPath, linkFile); err != nil && !os.IsExist(err) {
-					return fmt.Errorf("failed to create symlink %s -> %s: %w", linkFile, targetPath, err)
+				if err := symlink(targetPath, filepath.Join(catDir, name)); err != nil {
+					errs = append(errs, err)
 				}
 			}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // cleanSymlinks removes all symlinks below the data directory as well as
@@ -427,8 +500,16 @@ func (w *TxtWriter) LoadExisting() error {
 	return nil
 }
 
+// singleLine replaces line breaks, which would split a playlist entry and
+// inject extra lines, with spaces.
+func singleLine(s string) string {
+	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(s)
+}
+
 // Add adds a playlist entry to the writer's queue
 func (w *TxtWriter) Add(entry PlaylistEntry) {
+	entry.Name = singleLine(entry.Name)
+	entry.Source = singleLine(entry.Source)
 	if !w.history[entry.Source] {
 		w.queue = append(w.queue, entry)
 		w.history[entry.Source] = true
@@ -436,30 +517,27 @@ func (w *TxtWriter) Add(entry PlaylistEntry) {
 }
 
 // Dump writes the existing (appended) content plus all queued playlist
-// entries to the output file. The file is only created/replaced here, so a
-// failed indexing run never truncates a previously written playlist.
+// entries to the output file. The content is written to a temporary file
+// that replaces the playlist only when complete, so neither a failed
+// indexing run nor a failed write ever truncates an existing playlist.
 func (w *TxtWriter) Dump() error {
-	// #nosec G304 - Path is user-configured output file for legitimate file operations
-	file, err := os.Create(w.path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	if _, err := file.WriteString(w.start); err != nil {
-		return err
-	}
-	if _, err := file.WriteString(w.existingBody); err != nil {
-		return err
-	}
-
+	var b strings.Builder
+	b.WriteString(w.start)
+	b.WriteString(w.existingBody)
 	for _, entry := range w.queue {
-		if _, err := file.WriteString(w.formatter(entry) + "\n"); err != nil {
-			return err
-		}
+		b.WriteString(w.formatter(entry) + "\n")
 	}
+	b.WriteString(w.end)
 
-	if _, err := file.WriteString(w.end); err != nil {
+	tmp := w.path + ".tmp"
+	// Playlists are read by media players, possibly as another user.
+	// #nosec G306 - playlist files are intentionally world-readable
+	if err := os.WriteFile(tmp, []byte(b.String()), 0o644); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, w.path); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
 	return nil
@@ -511,6 +589,7 @@ func NewStdoutWriter(s *config.Settings) *StdoutWriter {
 
 // Add adds a playlist entry to the writer's queue
 func (w *StdoutWriter) Add(entry PlaylistEntry) {
+	entry.Source = singleLine(entry.Source)
 	w.queue = append(w.queue, entry)
 }
 
@@ -544,6 +623,9 @@ func (w *CommandWriter) Add(entry PlaylistEntry) {
 func (w *CommandWriter) Dump() error {
 	if len(w.queue) == 0 {
 		return nil
+	}
+	if len(w.s.Command) == 0 {
+		return errors.New("run mode requires a command to be specified")
 	}
 
 	var args []string

@@ -2,19 +2,23 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/api"
+	"github.com/darkace1998/jw-scripts/internal/cli"
 	"github.com/darkace1998/jw-scripts/internal/config"
-	"github.com/darkace1998/jw-scripts/internal/downloader"
 	"github.com/darkace1998/jw-scripts/internal/output"
 	"github.com/spf13/cobra"
 )
+
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
 
 var settings = &config.Settings{}
 var sinceDate string
@@ -48,10 +52,15 @@ You can also download JW Broadcasting monthly programs as MP3 using:
   jwb-music -c JWBroadcasting
 
 By default, it downloads all available music files. Use flags to customize the behavior.`,
+	Version: version,
+	Args:    cobra.MaximumNArgs(1),
 	Run: func(_ *cobra.Command, args []string) {
-		if len(args) > 0 {
-			settings.WorkDir = args[0]
+		dir, err := cli.WorkDir(args, "./music")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
+		settings.WorkDir = dir
 		if err := run(settings); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -64,21 +73,21 @@ func init() {
 	rootCmd.Flags().BoolVar(&settings.AudioOnly, "audio-only", true, "download only audio (MP3) files, skip video-only content (enabled by default)")
 	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", musicCategories, "comma separated list of music categories to include")
 	rootCmd.Flags().BoolVar(&settings.ListCategories, "list-categories", false, "list all available music categories")
-	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")
+	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "verify MD5 checksums of downloads (and of existing files with --fix-broken)")
 	rootCmd.Flags().BoolVarP(&settings.Download, "download", "d", true, "download music files (enabled by default)")
 	rootCmd.Flags().StringSliceVar(&settings.ExcludeCategories, "exclude", []string{}, "comma separated list of categories to skip")
-	rootCmd.Flags().BoolVar(&settings.OverwriteBad, "fix-broken", false, "check existing files and re-download them if they are broken")
+	rootCmd.Flags().BoolVar(&settings.OverwriteBad, "fix-broken", false, "check the size (and MD5 with --checksum) of existing files and re-download broken ones")
 	rootCmd.Flags().Int64Var(&settings.KeepFree, "free", 0, "disk space in MiB to keep free")
 	rootCmd.Flags().BoolVarP(&settings.FriendlyFilenames, "friendly", "H", false, "save downloads with human readable names")
-	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of music files from this directory (offline)")
+	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "copy music files from this directory into the library (offline import)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
-	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "embed metadata in downloaded files (ID3 for MP3, MP4 atoms for video); unsupported formats get a JSON sidecar file")
+	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "write an .nfo metadata file next to each download (read by Jellyfin, Emby and Kodi; Plex via an NFO agent)")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.Mode, "mode", "m", "", "output mode (filesystem, html, m3u, run, stdout, txt)")
 	rootCmd.Flags().StringVarP(&settings.OutputFilename, "output", "o", "", "output filename for txt/m3u/html modes")
 	rootCmd.Flags().BoolVar(&noWarning, "no-warning", false, "do not warn when the disk space limit (--free) seems wrong")
-	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
+	rootCmd.Flags().CountVarP(&settings.Quiet, "quiet", "q", "less info, can be used multiple times (-q, -qq or --quiet=N)")
 	rootCmd.Flags().BoolVar(&settings.SafeFilenames, "safe-filenames", runtime.GOOS == "windows", "use filesystem-safe filenames (automatically enabled on Windows)")
 	rootCmd.Flags().StringVar(&sinceDate, "since", "", "only index music newer than this date (YYYY-MM-DD)")
 	rootCmd.Flags().StringVar(&settings.Sort, "sort", "", "sort output (newest, oldest, name, random)")
@@ -131,6 +140,9 @@ func run(s *config.Settings) error {
 	if s.Mode == "" && !s.Download && s.ImportDir == "" {
 		return fmt.Errorf("please use --mode or --download (download is enabled by default)")
 	}
+	if err := output.ValidateMode(s.Mode); err != nil {
+		return err
+	}
 
 	if s.Update {
 		s.Append = true
@@ -149,6 +161,9 @@ func run(s *config.Settings) error {
 	}
 
 	// Convert MiB to bytes for disk space calculations
+	if s.KeepFree < 0 || s.KeepFree > math.MaxInt64/(1024*1024) {
+		return fmt.Errorf("invalid --free value %d: must be between 0 and %d MiB", s.KeepFree, int64(math.MaxInt64/(1024*1024)))
+	}
 	s.KeepFree *= 1024 * 1024
 
 	if s.WorkDir == "" {
@@ -158,8 +173,15 @@ func run(s *config.Settings) error {
 		s.SubDir = "jwb-music-" + s.Lang
 	}
 
-	// Check if JWBroadcasting is requested
+	return cli.Process(s, func() ([]*api.Category, error) { return indexMusic(s, client) })
+}
+
+// indexMusic indexes the requested music categories, including the special
+// JW Broadcasting audio category. Failures are returned together with the
+// data that could be indexed.
+func indexMusic(s *config.Settings, client *api.Client) ([]*api.Category, error) {
 	var data []*api.Category
+	var errs []error
 
 	hasJWBroadcasting := false
 	var otherCategories []string
@@ -175,7 +197,7 @@ func run(s *config.Settings) error {
 	if hasJWBroadcasting {
 		jwbData, err := client.GetBroadcastingMP3s()
 		if err != nil {
-			return fmt.Errorf("failed to fetch JW Broadcasting: %v", err)
+			errs = append(errs, fmt.Errorf("JW Broadcasting: %w", err))
 		}
 		data = append(data, jwbData...)
 	}
@@ -185,99 +207,13 @@ func run(s *config.Settings) error {
 		s.IncludeCategories = otherCategories
 		otherData, err := client.ParseBroadcasting()
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
 		data = append(data, otherData...)
 	}
 
-	// Offline import: scan the import directory for media files and add them to the data
-	if s.ImportDir != "" {
-		importedData, err := importOfflineMedia(s)
-		if err != nil {
-			return fmt.Errorf("offline import failed: %v", err)
-		}
-		data = append(data, importedData...)
-	}
-
-	if s.Download {
-		if err := downloader.DownloadAll(s, data); err != nil {
-			return err
-		}
-	}
-
-	if s.Mode != "" {
-		if err := output.CreateOutput(s, data); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// importOfflineMedia scans the import directory for media files and returns
-// them as categories that can be processed by the output/download pipeline.
-func importOfflineMedia(s *config.Settings) ([]*api.Category, error) {
-	entries, err := os.ReadDir(s.ImportDir)
-	if err != nil {
-		return nil, fmt.Errorf("could not read import directory: %w", err)
-	}
-
-	cat := &api.Category{
-		Key:  "imported",
-		Name: "Imported Media",
-		Home: true,
-	}
-
-	audioExts := map[string]bool{
-		".mp3": true, ".mp4": true, ".m4a": true,
-		".aac": true, ".ogg": true, ".wav": true,
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if !audioExts[ext] {
-			continue
-		}
-
-		fullPath, err := filepath.Abs(filepath.Join(s.ImportDir, entry.Name()))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not resolve path for %s: %v\n", entry.Name(), err)
-			continue
-		}
-
-		info, err := entry.Info()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not get file info for %s: %v\n", entry.Name(), err)
-			continue
-		}
-
-		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-
-		media := &api.Media{
-			URL:      fullPath,
-			Name:     name,
-			Filename: entry.Name(),
-			Size:     info.Size(),
-			Date:     info.ModTime().Unix(),
-		}
-
-		// FriendlyName is used as the symlink name in filesystem mode, so it
-		// must always be set, not only when --friendly is enabled.
-		media.FriendlyName = entry.Name()
-
-		cat.Contents = append(cat.Contents, media)
-	}
-
-	if len(cat.Contents) == 0 {
-		return nil, nil
-	}
-
-	if s.Quiet < 1 {
-		fmt.Fprintf(os.Stderr, "imported %d files from %s\n", len(cat.Contents), s.ImportDir)
-	}
-
-	return []*api.Category{cat}, nil
+	// Both sources share one download directory, so names must be unique
+	// across them.
+	api.AssignFilenames(s, data)
+	return data, errors.Join(errs...)
 }

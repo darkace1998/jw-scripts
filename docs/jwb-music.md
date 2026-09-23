@@ -35,22 +35,22 @@ jwb-music -L
 | `--append` | | `false` | append to file instead of overwriting |
 | `--audio-only` | | `true` | download only audio (MP3) files, skip video-only content (enabled by default) |
 | `--category` | `-c` | all music categories | comma separated list of music categories to include |
-| `--checksum` | | `false` | validate MD5 checksums |
+| `--checksum` | | `false` | verify MD5 checksums of downloads (and of existing files with `--fix-broken`) |
 | `--download` | `-d` | `true` | download music files (enabled by default) |
 | `--exclude` | | `""` | comma separated list of categories to skip |
-| `--fix-broken` | | `false` | check existing files and re-download them if they are broken |
+| `--fix-broken` | | `false` | check the size (and MD5 with `--checksum`) of existing files and re-download broken ones |
 | `--free` | | `0` | disk space in MiB to keep free |
 | `--friendly` | `-H` | `false` | save downloads with human readable names |
-| `--import` | | `""` | import of music files from this directory (offline) |
+| `--import` | | `""` | copy music files from this directory into the library (offline import) |
 | `--lang` | `-l` | `E` | language code |
 | `--languages` | `-L` | `false` | display a list of valid language codes |
 | `--limit-rate` | `-R` | `25.0` | maximum download rate, in megabytes/s |
 | `--list-categories` | | `false` | list all available music categories |
-| `--metadata` | | `false` | embed metadata in downloaded files (ID3 tags for MP3, MP4 atoms for video); formats that cannot carry tags get a JSON sidecar file (`<filename>.json`) |
+| `--metadata` | | `false` | write an `.nfo` metadata file next to each download, see [Metadata files](WIKI.md#metadata-files) (media servers read music metadata only from embedded tags) |
 | `--mode` | `-m` | `""` | output mode (filesystem, html, m3u, run, stdout, txt) |
 | `--output` | `-o` | `""` | output filename for txt/m3u/html modes |
 | `--no-warning` | | `false` | do not warn when the disk space limit (`--free`) seems wrong |
-| `--quiet` | `-q` | `0` | less info, can be used multiple times |
+| `--quiet` | `-q` | `0` | less info, can be repeated (`-q`, `-qq`) or given a level (`--quiet=2`) |
 | `--safe-filenames` | | `false` (Windows: `true`) | use filesystem-safe filenames (automatically enabled on Windows) |
 | `--since` | | `0` | only index music newer than this date (YYYY-MM-DD) |
 | `--sort` | | `""` | sort output (newest, oldest, name, random) |

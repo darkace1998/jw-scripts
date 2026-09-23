@@ -36,6 +36,8 @@ docker run --rm \
 | `JW_WORKDIR` | `/data` | Working directory for command execution |
 | `RUN_ON_STARTUP` | `true` | If `true`, executes one run before starting cron |
 | `TZ` | `UTC` | Timezone used inside the container |
+| `PUID` | `1000` | User ID that runs the commands and owns downloaded files (`0` = root) |
+| `PGID` | `1000` | Group ID that runs the commands and owns downloaded files (`0` = root) |
 
 ## Cron schedule explained
 
@@ -68,7 +70,8 @@ Quick examples:
 Tips:
 
 - Set `TZ` if you want local-time scheduling instead of UTC.
-- Use `RUN_ON_STARTUP=true` to execute immediately when the container starts, then continue on the cron schedule.
+- Use `RUN_ON_STARTUP=true` to execute immediately when the container starts, then continue on the cron schedule. A failed first run (for example while the network is not up yet) is logged and the schedule still starts.
+- A run that is still going when the next one is due is not started twice; downloads that stall for 2 minutes are aborted.
 
 ## Common command examples
 
@@ -90,8 +93,25 @@ JW_COMMAND="jwb-books --category daily-text --language E --format pdf --output /
 CRON_SCHEDULE="0 6 * * *"
 ```
 
+## One-off commands
+
+Arguments after the image name are run once instead of starting the schedule:
+
+```bash
+docker run --rm -v "$(pwd)/data:/data" jw-scripts:latest \
+  jwb-books --category bible --format epub --output /data/books
+docker run --rm jw-scripts:latest jwb-index --version
+```
+
+## File ownership
+
+Commands run as `PUID:PGID` (default `1000:1000`) instead of root, and downloaded files and directories are readable by everyone. A media server container (Jellyfin, Emby, Plex) can therefore read the files directly.
+
+Earlier images ran as root. When the data directory is owned by root, its ownership is changed to `PUID:PGID` once at startup. To keep running as root, set `PUID=0` and `PGID=0`.
+
 ## Notes
 
 - The container writes all downloaded/output files under `/data` by default.
 - Always mount `/data` as a volume to persist files between container restarts.
-- GitHub Actions workflow `.github/workflows/docker.yml` builds the image for PR validation and publishes to GHCR only on version tags (`v*`).
+- GitHub Actions workflow `.github/workflows/docker.yml` builds the image for PR validation and publishes to GHCR only on version tags (`v*`). Pre-release tags (for example `v2.0.0-rc.1`) do not update `latest`.
+- `supercronic` is built from source during the image build, so its integrity is checked against the Go checksum database.

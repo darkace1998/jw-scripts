@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/darkace1998/jw-scripts/internal/api"
 	"github.com/darkace1998/jw-scripts/internal/config"
 	"github.com/darkace1998/jw-scripts/internal/downloader"
 	"github.com/darkace1998/jw-scripts/internal/metadata"
@@ -48,7 +49,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	}
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0o750); err != nil {
+	if err := downloader.MkdirAll(outputDir); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -57,7 +58,7 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 		if err := d.downloadBookFile(book, targetFile, format, outputDir, i); err != nil {
 			errs = append(errs, fmt.Errorf("'%s' file %d/%d: %w", book.Title, i+1, len(targetFiles), err))
 			if d.settings.Quiet < 2 {
-				fmt.Printf("Failed: %v\n", errs[len(errs)-1])
+				fmt.Fprintf(os.Stderr, "Failed: %v\n", errs[len(errs)-1])
 			}
 		}
 	}
@@ -65,60 +66,96 @@ func (d *Downloader) DownloadBook(book *Book, format BookFormat, outputDir strin
 	return errors.Join(errs...)
 }
 
-// downloadBookFile downloads a single file of a book, validates its checksum
-// when available and optionally writes a metadata sidecar file.
+// downloadBookFile downloads a single file of a book, validates its size and
+// checksum when available and optionally writes an NFO metadata file.
 func (d *Downloader) downloadBookFile(book *Book, targetFile *BookFile, format BookFormat, outputDir string, index int) error {
 	filename := targetFile.Filename
-	if filename == "" {
-		// Generate a filename if the API did not provide one
-		safeTitle := strings.ReplaceAll(book.Title, "—", "-")
-		safeTitle = strings.ReplaceAll(safeTitle, ":", "_")
-		safeTitle = strings.ReplaceAll(safeTitle, "/", "_")
-		safeTitle = strings.ReplaceAll(safeTitle, "\\", "_")
-		if index > 0 {
-			safeTitle = fmt.Sprintf("%s (%d)", safeTitle, index+1)
+	if !hasBaseName(filename) {
+		// Generate a filename if the API did not provide a usable one
+		title := api.FormatFilename(strings.ReplaceAll(book.Title, "—", "-"), true)
+		if title == "" {
+			title = api.FormatFilename(book.ID, true)
 		}
-		filename = fmt.Sprintf("%s.%s", safeTitle, d.getFileExtension(format))
+		if title == "" {
+			title = "publication"
+		}
+		if index > 0 {
+			title = fmt.Sprintf("%s (%d)", title, index+1)
+		}
+		filename = fmt.Sprintf("%s.%s", title, d.getFileExtension(format))
 	}
 	outputPath := filepath.Join(outputDir, filename)
 
-	// Skip files that are already fully downloaded. With embedded metadata
-	// enabled, files grow beyond the size reported by the API, so anything
-	// at least as large as the original download counts as complete.
-	if fi, err := os.Stat(outputPath); err == nil && targetFile.Size > 0 {
-		complete := fi.Size() == targetFile.Size ||
-			(d.settings.WriteMetadata && fi.Size() > targetFile.Size)
-		if complete {
-			if d.settings.Quiet < 1 {
-				fmt.Printf("Already downloaded: %s\n", outputPath)
-			}
-			return d.writeMetadataIfEnabled(book, targetFile, outputDir, filename)
+	// Skip files that are already fully downloaded
+	if fi, err := os.Stat(outputPath); err == nil && d.isComplete(targetFile, outputPath, fi.Size()) {
+		if d.settings.Quiet < 1 {
+			fmt.Printf("Already downloaded: %s\n", outputPath)
 		}
+		return d.writeMetadataIfEnabled(book, targetFile, outputDir, filename)
 	}
 
 	if d.settings.Quiet < 1 {
 		fmt.Printf("Downloading: %s -> %s\n", book.Title, outputPath)
 	}
 
-	if err := downloader.DownloadFile(targetFile.URL, outputPath, false, d.settings.RateLimit); err != nil {
+	// Download to a temporary file so an interrupted or corrupt download
+	// never looks complete; an existing partial file is resumed.
+	tmpPath := outputPath + ".part"
+	_, statErr := os.Stat(tmpPath)
+	resume := statErr == nil
+	if err := downloader.DownloadFile(targetFile.URL, tmpPath, resume, d.settings.RateLimit, downloader.ShowProgress(d.settings.Quiet)); err != nil {
 		return err
 	}
 
-	if targetFile.Checksum != "" {
-		if err := d.ValidateChecksum(outputPath, targetFile.Checksum); err != nil {
-			if removeErr := os.Remove(outputPath); removeErr != nil && d.settings.Quiet < 2 {
-				fmt.Printf("Failed to remove corrupt file %s: %v\n", outputPath, removeErr)
-			}
-			return err
+	if err := d.verify(targetFile, tmpPath); err != nil {
+		if removeErr := os.Remove(tmpPath); removeErr != nil && d.settings.Quiet < 2 {
+			fmt.Fprintf(os.Stderr, "Failed to remove corrupt file %s: %v\n", tmpPath, removeErr)
 		}
+		return err
+	}
+	if err := os.Rename(tmpPath, outputPath); err != nil {
+		return err
 	}
 
 	return d.writeMetadataIfEnabled(book, targetFile, outputDir, filename)
 }
 
-// writeMetadataIfEnabled embeds metadata into a downloaded book file when
-// metadata generation is enabled (MP3/MP4). Formats that cannot carry
-// embedded tags, or files that fail to embed, get a JSON sidecar instead.
+// hasBaseName reports whether a filename has a real name besides its
+// extension (not just dots or spaces, which would hide or break the file).
+func hasBaseName(name string) bool {
+	return strings.Trim(strings.TrimSuffix(name, filepath.Ext(name)), ". ") != ""
+}
+
+// isComplete reports whether an existing file matches the expected download.
+// Without a known size, the checksum decides; without either, the file is
+// downloaded again.
+func (d *Downloader) isComplete(targetFile *BookFile, path string, size int64) bool {
+	if targetFile.Size > 0 {
+		return size == targetFile.Size
+	}
+	if targetFile.Checksum != "" {
+		return d.ValidateChecksum(path, targetFile.Checksum) == nil
+	}
+	return false
+}
+
+// verify checks a downloaded file against the size and checksum reported by
+// the API.
+func (d *Downloader) verify(targetFile *BookFile, path string) error {
+	if targetFile.Size > 0 {
+		fi, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if fi.Size() != targetFile.Size {
+			return fmt.Errorf("size mismatch: expected %d bytes, got %d", targetFile.Size, fi.Size())
+		}
+	}
+	return d.ValidateChecksum(path, targetFile.Checksum)
+}
+
+// writeMetadataIfEnabled writes an NFO metadata file next to a downloaded
+// book file when metadata generation is enabled.
 func (d *Downloader) writeMetadataIfEnabled(book *Book, targetFile *BookFile, outputDir, filename string) error {
 	if !d.settings.WriteMetadata {
 		return nil
@@ -133,30 +170,20 @@ func (d *Downloader) writeMetadataIfEnabled(book *Book, targetFile *BookFile, ou
 		Filename:    filename,
 		Language:    book.Language,
 		URL:         targetFile.URL,
-		SizeBytes:   targetFile.Size,
-		ChecksumMD5: targetFile.Checksum,
+		Description: book.Description,
 		Format:      string(targetFile.Format),
 		Publication: book.ID,
 		Issue:       book.Issue,
 	}
 
-	err := metadata.Embed(filepath.Join(outputDir, filename), meta)
-	if err == nil {
-		// Remove any sidecar left over from earlier versions that wrote
-		// JSON files instead of embedding.
-		_ = os.Remove(metadata.SidecarPath(outputDir, filename))
-		return nil
-	}
-	if !errors.Is(err, metadata.ErrUnsupportedFormat) && d.settings.Quiet < 2 {
-		fmt.Printf("Could not embed metadata in %s: %v; writing sidecar file instead\n", filename, err)
-	}
 	if err := metadata.Write(outputDir, filename, meta); err != nil {
 		return fmt.Errorf("failed to write metadata for %s: %w", filename, err)
 	}
 	return nil
 }
 
-// DownloadCategory downloads all books in a category
+// DownloadCategory downloads all books in a category. It returns an error if
+// any book failed to download.
 func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat, outputDir string) error {
 	if category == nil {
 		return fmt.Errorf("category cannot be nil")
@@ -171,7 +198,7 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 
 	// Create category subdirectory
 	categoryDir := filepath.Join(outputDir, category.Key)
-	if err := os.MkdirAll(categoryDir, 0o750); err != nil {
+	if err := downloader.MkdirAll(categoryDir); err != nil {
 		return fmt.Errorf("failed to create category directory: %w", err)
 	}
 
@@ -188,7 +215,7 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 		if err := d.DownloadBook(book, format, categoryDir); err != nil {
 			errorCount++
 			if d.settings.Quiet < 2 {
-				fmt.Printf("Failed to download '%s': %v\n", book.Title, err)
+				fmt.Fprintf(os.Stderr, "Failed to download '%s': %v\n", book.Title, err)
 			}
 		} else {
 			successCount++
@@ -200,6 +227,9 @@ func (d *Downloader) DownloadCategory(category *BookCategory, format BookFormat,
 			category.Name, successCount, errorCount)
 	}
 
+	if errorCount > 0 {
+		return fmt.Errorf("%d of %d publications in category '%s' failed to download", errorCount, len(category.Books), category.Name)
+	}
 	return nil
 }
 

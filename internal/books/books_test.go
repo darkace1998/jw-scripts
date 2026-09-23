@@ -93,16 +93,15 @@ func TestClientMethods(t *testing.T) {
 		t.Error("Expected GetCategories to return some categories")
 	}
 
+	// The remaining checks need the live API
+	if !client.IsBookAPIAvailable() {
+		t.Skip("JW.org publication API not reachable; skipping network-dependent checks")
+	}
+
 	// Test getting a specific category
 	_, err = client.GetCategory("E", "bible")
 	if err != nil {
 		t.Errorf("GetCategory for 'bible' returned error: %v", err)
-	}
-
-	// Test getting a book (this might fail if network is down, so we don't fail the test)
-	_, err = client.GetBook("E", "es25")
-	if err != nil {
-		t.Logf("GetBook returned error (may be expected if network issues): %v", err)
 	}
 
 	// Test search

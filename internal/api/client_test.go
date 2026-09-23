@@ -2,6 +2,7 @@ package api
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -111,61 +112,6 @@ func TestGetFriendlyFilename(t *testing.T) {
 			got := getFriendlyFilename(tc.n, tc.url, tc.safe)
 			if got != tc.want {
 				t.Errorf("getFriendlyFilename() = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestGetFriendlySubtitleFilename(t *testing.T) {
-	testCases := []struct {
-		name        string
-		n           string
-		subtitleURL string
-		safe        bool
-		want        string
-	}{
-		{
-			name:        "valid name and subtitle url",
-			n:           "My Awesome Video",
-			subtitleURL: "http://example.com/subtitle.vtt",
-			safe:        true,
-			want:        "My Awesome Video.vtt",
-		},
-		{
-			name:        "empty subtitle url",
-			n:           "My Awesome Video",
-			subtitleURL: "",
-			safe:        true,
-			want:        "",
-		},
-		{
-			name:        "name with special chars",
-			n:           "My:Awesome/Video",
-			subtitleURL: "http://example.com/subtitle.vtt",
-			safe:        true,
-			want:        "My-AwesomeVideo.vtt",
-		},
-		{
-			name:        "url without extension",
-			n:           "My Awesome Video",
-			subtitleURL: "http://example.com/subtitle123",
-			safe:        true,
-			want:        "My Awesome Video.vtt",
-		},
-		{
-			name:        "url with query params but no extension",
-			n:           "My Video",
-			subtitleURL: "http://example.com/clip.php?id=123",
-			safe:        true,
-			want:        "My Video.vtt",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := getFriendlySubtitleFilename(tc.n, tc.subtitleURL, tc.safe)
-			if got != tc.want {
-				t.Errorf("getFriendlySubtitleFilename() = %q, want %q", got, tc.want)
 			}
 		})
 	}
@@ -342,6 +288,36 @@ func TestFormatFilename(t *testing.T) {
 			safe: false,
 			want: "CON.mp4",
 		},
+		{
+			name: "dot-dot is never a filename",
+			s:    "..",
+			safe: false,
+			want: "",
+		},
+		{
+			name: "single dot is never a filename",
+			s:    ".",
+			safe: false,
+			want: "",
+		},
+		{
+			name: "path traversal is flattened",
+			s:    "../../etc/passwd",
+			safe: false,
+			want: "etcpasswd",
+		},
+		{
+			name: "leading dots are removed",
+			s:    ".hidden.mp4",
+			safe: false,
+			want: "hidden.mp4",
+		},
+		{
+			name: "control characters are removed",
+			s:    "a\nb\rc\td.mp4",
+			safe: false,
+			want: "abcd.mp4",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -450,6 +426,14 @@ func TestMakeUniqueFilename(t *testing.T) {
 			want:          "",
 		},
 		{
+			name:     "duplicate differing only in case",
+			filename: "Video.mp4",
+			usedFilenames: map[string]bool{
+				"video.mp4": true,
+			},
+			want: "Video (1).mp4",
+		},
+		{
 			name:     "filename without extension",
 			filename: "video",
 			usedFilenames: map[string]bool{
@@ -473,7 +457,7 @@ func TestMakeUniqueFilename(t *testing.T) {
 			}
 
 			// Verify the filename was added to the used map
-			if tc.filename != "" && !usedFilenames[got] {
+			if tc.filename != "" && !usedFilenames[strings.ToLower(got)] {
 				t.Errorf("makeUniqueFilename() did not add %q to usedFilenames map", got)
 			}
 		})

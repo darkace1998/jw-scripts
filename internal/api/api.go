@@ -11,17 +11,19 @@ type Category struct {
 
 // Media represents a single media item, like a video or audio file.
 type Media struct {
-	Date                     int64
-	Duration                 float64
-	MD5                      string
-	Name                     string
-	Size                     int64
-	SubtitleURL              string
-	URL                      string
-	Filename                 string
-	FriendlyName             string
-	SubtitleFilename         string
-	FriendlySubtitleFilename string
+	Date             int64
+	Duration         float64
+	MD5              string
+	Name             string
+	Size             int64
+	SubtitleURL      string
+	URL              string
+	Filename         string
+	FriendlyName     string
+	SubtitleFilename string
+	// LocalPath is set for media imported from a local directory (--import);
+	// such files are copied instead of downloaded.
+	LocalPath string
 }
 
 // File represents a media file, like a video or audio file.
@@ -84,13 +86,13 @@ type RootCategoriesResponse struct {
 
 // PubMediaFile represents a single file from the Publication Media API
 type PubMediaFile struct {
-	Title    string `json:"title"`
-	File     struct {
+	Title string `json:"title"`
+	File  struct {
 		URL              string `json:"url"`
 		ModifiedDatetime string `json:"modifiedDatetime"`
 		Checksum         string `json:"checksum"`
 	} `json:"file"`
-	Filesize   int64   `json:"filesize"`
+	Filesize   int64 `json:"filesize"`
 	TrackImage struct {
 		URL string `json:"url"`
 	} `json:"trackImage"`
