@@ -288,8 +288,9 @@ func TestPlayVideoInterruptedKeepsPosition(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm := NewVideoManager(&config.Settings{WorkDir: dir, Quiet: 2})
-	// The video path is appended as $0 of the shell script
-	vm.SetCmd([]string{"sh", "-c", "sleep 30"})
+	// The video path is appended as $0 of the shell script; exec makes the
+	// killed player process the sleep itself, so nothing is left running
+	vm.SetCmd([]string{"sh", "-c", "exec sleep 30"})
 	vm.SetReplay(0)
 	vm.video = video
 	vm.pos = 120
