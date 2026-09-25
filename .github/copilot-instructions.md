@@ -50,7 +50,7 @@ golangci-lint run --timeout=5m
   - `internal/api`: JW media/category endpoints (`data.jw-api.org`) and media selection logic.
   - `internal/books`: publication/media links (`b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS`) and publication model/downloader.
 - `internal/player` is independent of the downloader pipeline and persists playback state in `dump.json` inside the selected work directory.
-- `cmd/*analysis` binaries are diagnostic utilities used for API/content investigation and are not part of release assets (release workflow publishes only `jwb-index`, `jwb-offline`, `jwb-books`, `jwb-music`).
+- `tools/*` binaries are diagnostic utilities used for API/content investigation and are not part of release assets or the Docker image (only `cmd/` contains `jwb-index`, `jwb-offline`, `jwb-books`, `jwb-music`).
 
 ## Key conventions specific to this codebase
 
@@ -58,7 +58,9 @@ golangci-lint run --timeout=5m
 - `internal/api.Category.Contents` is intentionally heterogeneous (`[]interface{}` containing `*api.Category` and `*api.Media`); downstream code uses type assertions in multiple packages.
 - `jwb-index` and `jwb-music` intentionally share most flag semantics (`--download`, `--mode`, `--import`, `--since`, `--update`, `--friendly`, `--safe-filenames`, etc.). Keep parity unless divergence is deliberate.
 - `--update` behavior is compound: code sets append/sort/date-related behavior automatically rather than treating it as an isolated switch.
-- Filename handling and Windows compatibility are centralized in `internal/api/client.go` helper functions (`formatFilename`, `makeUniqueFilename`, safe filename behavior).
+- Filename handling and Windows compatibility are centralized in `internal/api/client.go` (`AssignFilenames`, `FormatFilename`, `makeUniqueFilename`). Call `api.AssignFilenames` again after combining media from several sources.
+- `--metadata` writes Kodi-style `.nfo` sidecar files (`internal/metadata`); media files are never modified.
+- Commands return partial results with an error: keep processing what was indexed and exit non-zero at the end (`internal/cli.Process`).
 - Downloader behavior expects `.part` files for resume and may perform checksum/size validation and disk cleanup before final rename.
 - CLI parsing is intentionally mixed today: `jwb-index`, `jwb-music`, `jwb-offline` use Cobra; `jwb-books` uses the standard `flag` package.
 - Several command tests shell out to `go run` and may exercise live API/network behavior; avoid introducing assumptions that all tests are purely offline unit tests.

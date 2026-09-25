@@ -5,11 +5,24 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/darkace1998/jw-scripts/internal/books"
 	"github.com/darkace1998/jw-scripts/internal/config"
 )
+
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
+// issuePattern matches magazine issues in YYYYMM format.
+var issuePattern = regexp.MustCompile(`^\d{6}$`)
+
+// fail prints an error message to stderr and exits with status 1.
+func fail(format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
+	os.Exit(1)
+}
 
 func main() {
 	// Command line flags
@@ -22,22 +35,38 @@ func main() {
 		format         = flag.String("format", "pdf", "Format to download (use --list-formats to see options)")
 		search         = flag.String("search", "", "Search for publications")
 		outputDir      = flag.String("output", "downloads", "Output directory for downloads")
-		writeMetadata  = flag.Bool("metadata", false, "Embed metadata in downloaded MP3/MP4 files; other formats get a JSON sidecar file")
+		issue          = flag.String("issue", "", "Magazine issue to download (YYYYMM, default: latest)")
+		writeMetadata  = flag.Bool("metadata", false, "Write an .nfo metadata file next to each download")
+		quiet          = flag.Int("quiet", 0, "Less output: 1 hides progress, 2 hides everything but errors")
+		rateLimit      = flag.Float64("limit-rate", 0, "Maximum download rate in megabytes/s (0 = unlimited)")
+		showVersion    = flag.Bool("version", false, "Show the version")
 		help           = flag.Bool("help", false, "Show help information")
 	)
 
+	flag.Usage = printHelp
 	flag.Parse()
 
 	if *help {
 		printHelp()
 		return
 	}
+	if *showVersion {
+		fmt.Println("jwb-books version", version)
+		return
+	}
+	if flag.NArg() > 0 {
+		fail("unexpected argument %q (use --help for usage)", flag.Arg(0))
+	}
+	if *issue != "" && !issuePattern.MatchString(*issue) {
+		fail("invalid --issue %q (expected YYYYMM, e.g. 202601)", *issue)
+	}
 
 	// Create settings
 	settings := &config.Settings{
-		Quiet:         0,
-		RateLimit:     0,
+		Quiet:         *quiet,
+		RateLimit:     *rateLimit,
 		WriteMetadata: *writeMetadata,
+		Issue:         *issue,
 	}
 
 	// Create client and downloader
@@ -72,6 +101,7 @@ func main() {
 
 	// Default: show help
 	printHelp()
+	os.Exit(2)
 }
 
 func printHelp() {
@@ -92,7 +122,11 @@ func printHelp() {
 	fmt.Println("  --format FORMAT       Format to download (default: pdf)")
 	fmt.Println("  --search QUERY        Search for publications")
 	fmt.Println("  --output DIR          Output directory (default: downloads)")
-	fmt.Println("  --metadata            Embed metadata in MP3/MP4 downloads (JSON sidecar for other formats)")
+	fmt.Println("  --issue YYYYMM        Magazine issue to download (default: latest)")
+	fmt.Println("  --metadata            Write an .nfo metadata file next to each download")
+	fmt.Println("  --quiet N             Less output (1: no progress, 2: errors only)")
+	fmt.Println("  --limit-rate MB       Maximum download rate in megabytes/s")
+	fmt.Println("  --version             Show the version")
 	fmt.Println("  --help                Show this help message")
 	fmt.Println()
 	fmt.Println("Examples:")
@@ -100,6 +134,7 @@ func printHelp() {
 	fmt.Println("  jwb-books --list-categories --language S")
 	fmt.Println("  jwb-books --category daily-text --language E --format pdf")
 	fmt.Println("  jwb-books --category bible --language S --format epub")
+	fmt.Println("  jwb-books --category magazines --issue 202601 --format epub")
 	fmt.Println("  jwb-books --search \"daily\" --language F")
 	fmt.Println()
 	fmt.Println("Supported Languages: English (E), Spanish (S), French (F), German (X), and 20+ more")
@@ -109,8 +144,7 @@ func printHelp() {
 func handleListLanguages(client *books.Client) {
 	languages, err := client.GetSupportedLanguages()
 	if err != nil {
-		fmt.Printf("Error getting languages: %v\n", err)
-		os.Exit(1)
+		fail("getting languages: %v", err)
 	}
 
 	fmt.Println("Supported Languages:")
@@ -155,14 +189,14 @@ func handleListFormats(client *books.Client) {
 func handleListCategories(client *books.Client, language string) {
 	categories, err := client.GetCategories()
 	if err != nil {
-		fmt.Printf("Error getting categories: %v\n", err)
-		os.Exit(1)
+		fail("getting categories: %v", err)
 	}
 
 	lang := getLanguageName(client, language)
 	fmt.Printf("Available Categories for %s:\n", lang)
 	fmt.Println("=============================")
-	for _, category := range categories {
+	for i := range categories {
+		category := &categories[i]
 		fmt.Printf("  %s - %s\n", category.Key, category.Name)
 		fmt.Printf("    %s\n", category.Description)
 		fmt.Printf("    Publications: %s\n", strings.Join(category.Publications, ", "))
@@ -173,8 +207,7 @@ func handleListCategories(client *books.Client, language string) {
 func handleSearch(client *books.Client, language, query string) {
 	results, err := client.SearchBooks(language, query)
 	if err != nil {
-		fmt.Printf("Error searching: %v\n", err)
-		os.Exit(1)
+		fail("searching: %v", err)
 	}
 
 	lang := getLanguageName(client, language)
@@ -218,21 +251,21 @@ func handleDownloadCategory(client *books.Client, downloader *books.Downloader, 
 	// Parse format
 	format := parseFormat(formatStr)
 	if format == books.FormatUnknown {
-		fmt.Printf("Error: Unknown format '%s'. Use --list-formats to see supported formats.\n", formatStr)
-		os.Exit(1)
+		fail("unknown format '%s'. Use --list-formats to see supported formats.", formatStr)
 	}
 
-	// Get category
-	category, err := client.GetCategory(language, categoryKey)
-	if err != nil {
-		fmt.Printf("Error getting category '%s': %v\n", categoryKey, err)
-		fmt.Println("Use --list-categories to see available categories.")
-		os.Exit(1)
+	// Get category. Publications that could not be found are reported, but
+	// the ones that were found are still downloaded.
+	category, lookupErr := client.GetCategory(language, categoryKey)
+	if category == nil {
+		fail("getting category '%s': %v\nUse --list-categories to see available categories.", categoryKey, lookupErr)
+	}
+	if lookupErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: some publications are unavailable: %v\n", lookupErr)
 	}
 
 	if len(category.Books) == 0 {
-		fmt.Printf("No books found in category '%s' for language '%s'\n", categoryKey, getLanguageName(client, language))
-		return
+		fail("no publications found in category '%s' for language '%s'", categoryKey, getLanguageName(client, language))
 	}
 
 	lang := getLanguageName(client, language)
@@ -241,10 +274,11 @@ func handleDownloadCategory(client *books.Client, downloader *books.Downloader, 
 	fmt.Println()
 
 	// Download the category
-	err = downloader.DownloadCategory(category, format, outputDir)
-	if err != nil {
-		fmt.Printf("Error downloading category: %v\n", err)
-		os.Exit(1)
+	if err := downloader.DownloadCategory(category, format, outputDir); err != nil {
+		fail("downloading category: %v", err)
+	}
+	if lookupErr != nil {
+		fail("not all publications in category '%s' were available", categoryKey)
 	}
 
 	fmt.Println("Download completed!")

@@ -2,16 +2,32 @@ package books
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/darkace1998/jw-scripts/internal/api"
 	"github.com/darkace1998/jw-scripts/internal/config"
+	"github.com/darkace1998/jw-scripts/internal/httpx"
 )
+
+// ErrNotFound is returned when a publication is not available in the
+// requested language.
+var ErrNotFound = errors.New("publication not found")
+
+// now returns the current time; tests replace it to get stable
+// year-dependent publication codes.
+var now = time.Now
+
+// magazineLookbackMonths is how far back the latest magazine issue is
+// searched when no --issue is given.
+const magazineLookbackMonths = 12
 
 // Client implements the BookAPI interface for JW.org book operations
 type Client struct {
@@ -46,11 +62,9 @@ type FileInfo struct {
 // NewClient creates a new book API client
 func NewClient(s *config.Settings) *Client {
 	return &Client{
-		baseURL: "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS",
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		settings: s,
+		baseURL:    "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS",
+		httpClient: httpx.NewClient(30 * time.Second),
+		settings:   s,
 	}
 }
 
@@ -88,82 +102,146 @@ func (c *Client) GetSupportedLanguages() ([]Language, error) {
 	return languages, nil
 }
 
-// GetCategories returns all available book categories
+// yearlyCodes returns publication codes built from prefix and a two-digit
+// year, one for every year offset relative to the current year, in order.
+func yearlyCodes(prefix string, offsets ...int) []string {
+	year := now().Year()
+	codes := make([]string, 0, len(offsets))
+	for _, off := range offsets {
+		codes = append(codes, fmt.Sprintf("%s%02d", prefix, (year+off)%100))
+	}
+	return codes
+}
+
+// GetCategories returns all available book categories.
+//
+// Many publications are released yearly with the year in their code (e.g.
+// es26 for the 2026 daily text). Their codes are computed from the current
+// date, and older editions are used as a fallback until the new one is out.
 func (c *Client) GetCategories() ([]BookCategory, error) {
-	// Pre-defined categories based on known publication types
 	categories := []BookCategory{
 		{
-			Key:          "bible",
-			Name:         "Bible",
-			Description:  "New World Translation of the Holy Scriptures",
-			Publications: []string{"nwtsty"},
+			Key:         "bible",
+			Name:        "Bible",
+			Description: "New World Translation of the Holy Scriptures",
+			candidates:  [][]string{{"nwtsty"}},
 		},
 		{
-			Key:          "daily-text",
-			Name:         "Daily Text",
-			Description:  "Examining the Scriptures Daily",
-			Publications: []string{"es25"},
+			Key:         "daily-text",
+			Name:        "Daily Text",
+			Description: "Examining the Scriptures Daily (current year)",
+			candidates:  [][]string{yearlyCodes("es", 0, -1)},
 		},
 		{
-			Key:          "yearbooks",
-			Name:         "Yearbooks",
-			Description:  "Watch Tower Publications Index and Yearbooks",
-			Publications: []string{"dx24"},
+			Key:         "yearbooks",
+			Name:        "Yearbooks",
+			Description: "Watch Tower Publications Index and Yearbooks (latest edition)",
+			candidates:  [][]string{yearlyCodes("dx", 0, -1, -2)},
 		},
 		{
-			Key:          "circuit-assembly",
-			Name:         "Circuit Assembly Programs",
-			Description:  "Circuit Assembly Programs",
-			Publications: []string{"ca-brpgm26"},
+			Key:         "circuit-assembly",
+			Name:        "Circuit Assembly Programs",
+			Description: "Circuit Assembly Programs (current service year)",
+			candidates:  [][]string{yearlyCodes("ca-brpgm", 1, 0)},
 		},
 		{
-			Key:          "convention",
-			Name:         "Convention Materials",
-			Description:  "Convention invitations and programs",
-			Publications: []string{"co-inv25"},
+			Key:         "convention",
+			Name:        "Convention Materials",
+			Description: "Convention invitations and programs (current year)",
+			candidates:  [][]string{yearlyCodes("co-inv", 0, -1)},
 		},
 		{
-			Key:          "magazines",
-			Name:         "Magazines",
-			Description:  "Watchtower and Awake! magazines (requires issue specification)",
-			Publications: []string{"w", "g"},
+			Key:         "magazines",
+			Name:        "Magazines",
+			Description: "Watchtower and Awake! magazines (latest issue, or the one given with --issue)",
+			candidates:  [][]string{{"w"}, {"g"}},
+			magazines:   true,
 		},
+	}
+
+	for i := range categories {
+		for _, codes := range categories[i].candidates {
+			categories[i].Publications = append(categories[i].Publications, codes[0])
+		}
 	}
 
 	return categories, nil
 }
 
-// GetCategory returns books in a specific category
+// GetCategory returns the books in a specific category. Publications that
+// cannot be found or fetched are reported in the returned error, while the
+// books that were found are still returned.
 func (c *Client) GetCategory(lang, categoryKey string) (*BookCategory, error) {
 	categories, err := c.GetCategories()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, category := range categories {
-		if category.Key == categoryKey {
-			// Populate books for this category
-			var books []Book
-			for _, pubCode := range category.Publications {
-				book, err := c.GetBook(lang, pubCode)
-				if err != nil {
-					// Log error but continue with other publications
-					continue
-				}
-				books = append(books, *book)
-			}
-			category.Books = books
-			return &category, nil
+	for i := range categories {
+		category := &categories[i]
+		if category.Key != categoryKey {
+			continue
 		}
+		var errs []error
+		for _, codes := range category.candidates {
+			book, err := c.resolveBook(lang, codes, category.magazines)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			category.Books = append(category.Books, *book)
+		}
+		return category, errors.Join(errs...)
 	}
 
 	return nil, fmt.Errorf("category '%s' not found", categoryKey)
 }
 
+// resolveBook returns the first available publication among codes. For
+// magazines it returns the issue given in the settings, or the latest issue
+// published in the last year.
+func (c *Client) resolveBook(lang string, codes []string, magazine bool) (*Book, error) {
+	if magazine {
+		code := codes[0]
+		if c.settings.Issue != "" {
+			return c.GetBookIssue(lang, code, c.settings.Issue)
+		}
+		t := now()
+		month := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < magazineLookbackMonths; i++ {
+			book, err := c.GetBookIssue(lang, code, month.AddDate(0, -i, 0).Format("200601"))
+			if err == nil {
+				return book, nil
+			}
+			if !errors.Is(err, ErrNotFound) {
+				return nil, err
+			}
+		}
+		return nil, fmt.Errorf("no issue of '%s' found in the last %d months: %w", code, magazineLookbackMonths, ErrNotFound)
+	}
+
+	for _, code := range codes {
+		book, err := c.GetBook(lang, code)
+		if err == nil {
+			return book, nil
+		}
+		if !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("none of the publications %s is available in language %s: %w", strings.Join(codes, ", "), lang, ErrNotFound)
+}
+
 // GetBook returns details for a specific book
 func (c *Client) GetBook(lang, bookID string) (*Book, error) {
+	return c.GetBookIssue(lang, bookID, "")
+}
+
+// GetBookIssue returns details for a specific issue of a publication. An
+// empty issue fetches the publication itself.
+func (c *Client) GetBookIssue(lang, bookID, issue string) (*Book, error) {
 	// Make request to the publication API
-	pubResp, err := c.getPublicationDataForLanguage(bookID, "", lang)
+	pubResp, err := c.getPublicationDataForLanguage(bookID, issue, lang)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get publication data for '%s': %w", bookID, err)
 	}
@@ -194,13 +272,18 @@ func (c *Client) GetBook(lang, bookID string) (*Book, error) {
 					Checksum: fileInfo.File.Checksum,
 					Title:    fileInfo.Title,
 				}
-				// Extract filename from URL since the API doesn't provide one directly
+				// Extract filename from URL since the API doesn't provide one
+				// directly. It must be a single safe path element on every OS.
 				if u, err := url.Parse(fileInfo.File.URL); err == nil {
-					bookFile.Filename = path.Base(u.Path)
+					bookFile.Filename = api.FormatFilename(filepath.Base(path.Base(u.Path)), true)
 				}
 				book.Files = append(book.Files, bookFile)
 			}
 		}
+	}
+
+	if len(book.Files) == 0 {
+		return nil, fmt.Errorf("publication '%s' has no files in language %s: %w", bookID, lang, ErrNotFound)
 	}
 
 	return book, nil
@@ -215,17 +298,22 @@ func (c *Client) SearchBooks(lang, query string) ([]Book, error) {
 	}
 
 	var results []Book
+	var errs []error
 	queryLower := strings.ToLower(query)
 
-	for _, category := range categories {
+	for i := range categories {
+		category := &categories[i]
 		// Check if query matches the category name or key
 		categoryMatch := strings.Contains(strings.ToLower(category.Name), queryLower) ||
 			strings.Contains(strings.ToLower(category.Key), queryLower) ||
 			strings.Contains(strings.ToLower(category.Description), queryLower)
 
-		for _, pubCode := range category.Publications {
-			book, err := c.GetBook(lang, pubCode)
+		for _, codes := range category.candidates {
+			book, err := c.resolveBook(lang, codes, category.magazines)
 			if err != nil {
+				if !errors.Is(err, ErrNotFound) {
+					errs = append(errs, err)
+				}
 				continue
 			}
 
@@ -238,6 +326,10 @@ func (c *Client) SearchBooks(lang, query string) ([]Book, error) {
 		}
 	}
 
+	// Report failures only when they may have hidden results
+	if len(results) == 0 && len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
 	return results, nil
 }
 
@@ -265,7 +357,7 @@ func (c *Client) IsBookAPIAvailable() bool {
 		return false
 	}
 
-	req, err := http.NewRequest("GET", parsedURL.String(), http.NoBody)
+	req, err := http.NewRequest(http.MethodGet, parsedURL.String(), http.NoBody)
 	if err != nil {
 		return false
 	}
@@ -288,10 +380,10 @@ Available Features:
 - Multiple formats: PDF, EPUB, MP3, MP4, RTF, BRL
 - 25+ languages including major world languages
 - Bible (New World Translation Study Edition)
-- Daily text publications
-- Yearbooks and indexes
-- Circuit assembly and convention materials
-- Magazine downloads (with issue specification)
+- Daily text for the current year
+- Latest publications index
+- Current circuit assembly and convention materials
+- Latest magazine issues (or a specific one with --issue YYYYMM)
 
 Supported Languages:
 - English, Spanish, French, Portuguese, German, Polish, Swedish
@@ -320,12 +412,15 @@ func (c *Client) getPublicationDataForLanguage(pubCode, issue, lang string) (*Pu
 
 	requestURL := c.baseURL + "?" + params.Encode()
 
-	resp, err := c.httpClient.Get(requestURL)
+	resp, err := httpx.Get(c.httpClient, requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("publication '%s': %w", pubCode, ErrNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d for publication '%s'", resp.StatusCode, pubCode)
 	}

@@ -27,6 +27,9 @@ jwb-books --category daily-text --language E --format pdf
 # Download the Bible in Spanish (EPUB)
 jwb-books --category bible --language S --format epub
 
+# Download a specific Watchtower/Awake! issue (default: the latest one)
+jwb-books --category magazines --issue 202601 --format epub
+
 # Search for publications
 jwb-books --search "daily" --language F
 ```
@@ -38,13 +41,17 @@ jwb-books --search "daily" --language F
 | `--category` | `""` | Category to download (use `--list-categories` to see options) |
 | `--format` | `pdf` | Format to download (use `--list-formats` to see options) |
 | `--help` | `false` | Show help information |
+| `--issue` | `""` | Magazine issue to download (`YYYYMM`); default: the latest issue of the last 12 months |
 | `--language` | `E` | Language code (use `--list-languages` to see options) |
 | `--list-categories` | `false` | List all available categories |
 | `--list-formats` | `false` | List all supported formats |
 | `--list-languages` | `false` | List all supported languages |
-| `--metadata` | `false` | Embed metadata in downloaded MP3/MP4 files; other formats (PDF, EPUB, ...) get a JSON sidecar file (`<filename>.json`) |
+| `--limit-rate` | `0` | Maximum download rate in megabytes/s (`0` = unlimited) |
+| `--metadata` | `false` | Write an `.nfo` metadata file next to each download, see [Metadata files](WIKI.md#metadata-files) |
 | `--output` | `downloads` | Output directory for downloads |
+| `--quiet` | `0` | Less output: `1` hides progress, `2` shows only errors |
 | `--search` | `""` | Search for publications |
+| `--version` | `false` | Show the version |
 
 ## Categories
 
@@ -53,11 +60,15 @@ The following publication categories are available:
 | Category Key | Name | Description | Publications |
 |---|---|---|---|
 | `bible` | Bible | New World Translation of the Holy Scriptures | nwtsty |
-| `daily-text` | Daily Text | Examining the Scriptures Daily | es25 |
-| `yearbooks` | Yearbooks | Watch Tower Publications Index and Yearbooks | dx24 |
-| `circuit-assembly` | Circuit Assembly Programs | Circuit Assembly Programs | ca-brpgm26 |
-| `convention` | Convention Materials | Convention invitations and programs | co-inv25 |
-| `magazines` | Magazines | Watchtower and Awake! magazines | w, g |
+| `daily-text` | Daily Text | Examining the Scriptures Daily | `es` + current year (e.g. es26), else last year's |
+| `yearbooks` | Yearbooks | Watch Tower Publications Index and Yearbooks | newest `dx` edition of the last 3 years |
+| `circuit-assembly` | Circuit Assembly Programs | Circuit Assembly Programs | `ca-brpgm` for the current service year |
+| `convention` | Convention Materials | Convention invitations and programs | `co-inv` + current year, else last year's |
+| `magazines` | Magazines | Watchtower and Awake! magazines | w, g (latest issue, or `--issue`) |
+
+Yearly publication codes are computed from the current date, so the categories stay current without updates to the tool. `--list-categories` shows the codes that will be tried first.
+
+Files are downloaded to a `.part` file and only kept when the size and MD5 checksum reported by the API match. Files that are already complete are skipped. The command exits with a non-zero status if a publication could not be found or downloaded.
 
 To see all available categories for a specific language:
 

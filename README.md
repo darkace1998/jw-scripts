@@ -61,7 +61,7 @@ Indexes and optionally downloads JW Broadcasting media.
 # Generate a playlist file
 ./bin/jwb-index --mode txt --output playlist.txt
 
-# Download and embed metadata (title, category, date, ...) in the media files
+# Download and write .nfo metadata files for Jellyfin, Emby, Kodi and Plex
 ./bin/jwb-index --download --metadata
 ```
 
@@ -100,6 +100,7 @@ Plays downloaded local videos with shuffle/replay behavior.
 ## Documentation
 
 - Main command wiki: [docs/WIKI.md](docs/WIKI.md)
+- Media server metadata (NFO files): [docs/WIKI.md#metadata-files](docs/WIKI.md#metadata-files)
 - Books command details: [docs/jwb-books.md](docs/jwb-books.md)
 - Music command details: [docs/jwb-music.md](docs/jwb-music.md)
 - Docker runtime and cron configuration: [docs/docker.md](docs/docker.md)
@@ -119,8 +120,10 @@ go test -v -race ./...
 golangci-lint run --timeout=5m
 ```
 
+Diagnostic tools used to investigate the JW.org API live in `tools/` and are not part of releases or the Docker image (`go run ./tools/api-analysis`).
+
 CI and release automation are implemented with GitHub Actions:
-- CI: tests, linting, security scan, binary build checks
+- CI: tests, linting, security scan (gosec, govulncheck), binary build checks
 - Docker: multi-arch image build, published to GHCR on version tags (`v*`)
 - Release: multi-platform binaries and archives on `v*` tags
 

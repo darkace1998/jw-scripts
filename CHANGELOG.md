@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **`--metadata` now writes an `.nfo` file next to each download instead of modifying the media files.** NFO is the Kodi XML format that Jellyfin, Emby and Kodi read natively (Plex via an NFO agent such as XBMCnfoMoviesImporter). Each file is described as a `<movie>` with title, release date, runtime, category, studio and source URL. MP3/MP4 files are no longer rewritten with ID3 tags or MP4 atoms, so their size and MD5 match the API again. JSON sidecar files from earlier versions are removed; tags already embedded by earlier versions are left in place. Media servers read music metadata only from embedded tags, so NFO files next to MP3s are informational.
+- `--quiet`/`-q` is now a counter as documented: use `-q`, `-qq` or `--quiet=2`. The old `-q 2` form is rejected with a hint instead of treating `2` as the download directory.
+- Subtitles are named after their video (`<video name>.vtt`) so players and media servers load them automatically. Existing subtitle files keep their old names and are downloaded again under the new name.
+- Commands exit with a non-zero status when anything failed (categories that could not be indexed, failed downloads, missing publications) after finishing all work that could still be done. A playlist file is not rewritten from an incomplete index unless `--append` is used.
+- The Docker image runs commands as `PUID:PGID` (default `1000:1000`) instead of root, and moves a root-owned data directory over once. Set `PUID=0 PGID=0` to keep running as root. Arguments after the image name are now run as a one-off command.
+- Downloaded files, directories, playlists and metadata files are readable by other users (for media servers running as a different user).
+- `jwb-books` computes year-based publication codes (daily text, publications index, circuit assembly, convention) from the current date and falls back to the previous edition, instead of using hard-coded 2024/2025 codes. The `magazines` category downloads the latest Watchtower and Awake! issues, or the one given with the new `--issue YYYYMM` flag.
+- Diagnostic tools moved from `cmd/` to `tools/`, so `go build ./cmd/...` and the Docker image contain only the four commands.
+
+### Added
+- `--version` for all commands; release and Docker builds embed the version.
+- `jwb-books`: `--issue`, `--quiet`, `--limit-rate` and `--version` flags.
+- API requests send a User-Agent and are retried on network errors, HTTP 429 and 5xx responses.
+- CI runs `govulncheck`; Dependabot also updates GitHub Actions and Docker base images.
+
+### Fixed
+- Downloads could hang forever on a stalled connection; connection setup and response headers now time out and a download that receives no data for 2 minutes is aborted.
+- A complete `.part` file failed with HTTP 416 on every run and was never finished; it is now finished, and a stale partial file is downloaded again.
+- `--checksum` had no effect on new downloads; new downloads are now checked against the API size (and MD5 with `--checksum`) before they are moved into place.
+- `--import` failed for every file when downloading was enabled (the default in `jwb-music`); imported files are now copied into the library.
+- Media that appears in several categories was downloaded once per category under different names; it is now downloaded once.
+- `--friendly` names for media with the same title depended on the order of API results and could swap between runs; the oldest item now keeps the plain name. Names are also compared case-insensitively for Windows and macOS.
+- A media item without subtitles could leave its subtitle name to another video with the same title, so players showed the wrong subtitles.
+- `--free` aborted the whole run when no MP4 file was left to delete; the download is now skipped with a clear message. Removing an old video also removes its subtitle and metadata files.
+- Filesystem mode stopped at the first category name containing `/`; names from the API are sanitized so they cannot create paths outside the work directory, and one failing link no longer stops the others.
+- Titles with line breaks could inject extra entries into M3U/TXT playlists.
+- Playlists are replaced atomically, write errors are reported, and paths are relative to the playlist file (also with `--output sub/list.m3u`).
+- An invalid `--mode` is reported before indexing and downloading start.
+- `jwb-books` filenames from the API are sanitized (a crafted URL could write outside the output directory on Windows), downloads go through a `.part` file, and errors go to stderr with a non-zero exit status.
+- `jwb-offline` had a data race when saving its state on Ctrl+C/SIGTERM and printed a false shutdown message on errors; the player is now stopped cleanly and the position is saved. A deleted video from the saved state is skipped.
+- The Docker container stopped before starting the schedule when the first run failed.
+- The Docker base image moved from the end-of-life Alpine 3.20 to Alpine 3.22; `supercronic` is built from source and checked against the Go checksum database instead of being downloaded without verification.
+- Release builds set `main.version` (the flag was a no-op), manual release runs build the requested tag, the tag input can no longer inject shell commands, and pre-release tags are published as pre-releases without updating the Docker `latest` tag.
+- CI pins GitHub Actions to commit SHAs and golangci-lint to a fixed version; Codecov uploads use the current action inputs.
+- `go.mod` requests a patched Go 1.25 toolchain; builds on platforms other than Linux, macOS and Windows no longer fail (`--free` reports that it is unsupported there).
+
 ## [v1.7.1] - 2026-08-04
 
 ### Added

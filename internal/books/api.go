@@ -38,6 +38,13 @@ type BookCategory struct {
 	Description  string   `json:"description"`
 	Publications []string `json:"publications"` // Publication codes for this category
 	Books        []Book   `json:"books"`
+
+	// candidates lists, for every publication of the category, the codes to
+	// try in order (the newest edition first).
+	candidates [][]string
+	// magazines marks categories whose publications are periodicals that
+	// need an issue.
+	magazines bool
 }
 
 // Book represents a publication/book item

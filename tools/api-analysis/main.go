@@ -47,14 +47,10 @@ func main() {
 
 	fmt.Printf("Total categories returned by API: %d\n\n", len(rootResp.Categories))
 
-	// Analyze the filtering logic
-	majorExcludeTags := map[string]bool{
-		"WebExclude":   true,
-		"JWORGExclude": true,
-	}
-
-	knownUseful := map[string]bool{
-		"Audio": true,
+	// Use the same filtering logic as the API client
+	included := make(map[string]bool)
+	for _, key := range api.FilterRootCategories(&rootResp) {
+		included[key] = true
 	}
 
 	var includedCategories []string
@@ -86,18 +82,7 @@ func main() {
 	})
 
 	for _, cat := range categories {
-		// Check if this category has major exclude tags
-		hasMajorExclude := false
-		for _, tag := range cat.Tags {
-			if majorExcludeTags[tag] {
-				hasMajorExclude = true
-				break
-			}
-		}
-
-		// Apply the same filtering logic as the code
-		if (cat.Type == "container" || cat.Type == "ondemand") &&
-			(!hasMajorExclude || knownUseful[cat.Key]) {
+		if included[cat.Key] {
 			includedCategories = append(includedCategories, cat.Key)
 		} else {
 			excludedCategories = append(excludedCategories, cat.Key)

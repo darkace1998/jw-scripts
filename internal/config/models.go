@@ -35,6 +35,7 @@ type Settings struct {
 	Mode              string
 	SafeFilenames     bool
 	Sort              string
-	AudioOnly         bool // prefer audio (MP3) files over video (MP4) files
-	WriteMetadata     bool // write JSON metadata sidecar files for downloaded files
+	AudioOnly         bool   // prefer audio (MP3) files over video (MP4) files
+	WriteMetadata     bool   // write NFO metadata files for downloaded files
+	Issue             string // magazine issue (YYYYMM) for jwb-books
 }

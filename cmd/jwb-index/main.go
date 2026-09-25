@@ -3,30 +3,38 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/api"
+	"github.com/darkace1998/jw-scripts/internal/cli"
 	"github.com/darkace1998/jw-scripts/internal/config"
-	"github.com/darkace1998/jw-scripts/internal/downloader"
 	"github.com/darkace1998/jw-scripts/internal/output"
 	"github.com/spf13/cobra"
 )
+
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
 
 var settings = &config.Settings{}
 var sinceDate string
 var noWarning bool
 
 var rootCmd = &cobra.Command{
-	Use:   "jwb-index",
-	Short: "Index or download media from jw.org",
+	Use:     "jwb-index",
+	Short:   "Index or download media from jw.org",
+	Version: version,
+	Args:    cobra.MaximumNArgs(1),
 	Run: func(_ *cobra.Command, args []string) {
-		if len(args) > 0 {
-			settings.WorkDir = args[0]
+		dir, err := cli.WorkDir(args, ".")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
+		settings.WorkDir = dir
 		if err := run(settings); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -39,20 +47,20 @@ func init() {
 	rootCmd.Flags().BoolVar(&settings.AudioOnly, "audio-only", false, "download only audio (MP3) files, skip video-only content")
 	rootCmd.Flags().StringSliceVarP(&settings.IncludeCategories, "category", "c", []string{"VideoOnDemand"}, "comma separated list of categories to index (use --list-categories-all to see available categories)")
 	rootCmd.Flags().BoolVar(&settings.ListCategories, "list-categories-all", false, "list all available root categories")
-	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "validate MD5 checksums")
+	rootCmd.Flags().BoolVar(&settings.Checksums, "checksum", false, "verify MD5 checksums of downloads (and of existing files with --fix-broken)")
 	rootCmd.Flags().BoolVar(&settings.CleanAllSymlinks, "clean-symlinks", false, "remove all old symlinks (mode=filesystem)")
 	rootCmd.Flags().StringSliceVar(&settings.Command, "command", []string{}, "command to execute in run mode")
 	rootCmd.Flags().BoolVarP(&settings.Download, "download", "d", false, "download media files")
 	rootCmd.Flags().BoolVar(&settings.DownloadSubtitles, "download-subtitles", false, "download VTT subtitle files")
 	rootCmd.Flags().StringSliceVar(&settings.ExcludeCategories, "exclude", []string{"VODSJJMeetings"}, "comma separated list of categories to skip")
-	rootCmd.Flags().BoolVar(&settings.OverwriteBad, "fix-broken", false, "check existing files and re-download them if they are broken")
+	rootCmd.Flags().BoolVar(&settings.OverwriteBad, "fix-broken", false, "check the size (and MD5 with --checksum) of existing files and re-download broken ones")
 	rootCmd.Flags().Int64Var(&settings.KeepFree, "free", 0, "disk space in MiB to keep free")
 	rootCmd.Flags().BoolVarP(&settings.FriendlyFilenames, "friendly", "H", false, "save downloads with human readable names")
 	rootCmd.Flags().BoolVar(&settings.HardSubtitles, "hard-subtitles", false, "prefer videos with hard-coded subtitles")
-	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "import of media files from this directory (offline)")
+	rootCmd.Flags().StringVar(&settings.ImportDir, "import", "", "copy media files from this directory into the library (offline import)")
 	rootCmd.Flags().StringVarP(&settings.Lang, "lang", "l", "E", "language code")
 	rootCmd.Flags().BoolVarP(&settings.ListLanguages, "languages", "L", false, "display a list of valid language codes")
-	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "embed metadata in downloaded media files (ID3 for MP3, MP4 atoms for video); unsupported formats get a JSON sidecar file")
+	rootCmd.Flags().BoolVar(&settings.WriteMetadata, "metadata", false, "write an .nfo metadata file next to each download (read by Jellyfin, Emby and Kodi; Plex via an NFO agent)")
 	rootCmd.Flags().BoolVarP(&settings.Latest, "latest", "D", false, "fetch subtitles and videos from the past 31 days up to today (31-day window ending today)")
 	rootCmd.Flags().Float64VarP(&settings.RateLimit, "limit-rate", "R", 25.0, "maximum download rate, in megabytes/s")
 	rootCmd.Flags().StringVarP(&settings.PrintCategory, "list-categories", "C", "", "print a list of (sub) category names")
@@ -60,7 +68,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&settings.OutputFilename, "output", "o", "", "output filename for txt/m3u/html modes")
 	rootCmd.Flags().BoolVar(&noWarning, "no-warning", false, "do not warn when the disk space limit (--free) seems wrong")
 	rootCmd.Flags().IntVarP(&settings.Quality, "quality", "Q", 720, "maximum video quality")
-	rootCmd.Flags().IntVarP(&settings.Quiet, "quiet", "q", 0, "less info, can be used multiple times")
+	rootCmd.Flags().CountVarP(&settings.Quiet, "quiet", "q", "less info, can be used multiple times (-q, -qq or --quiet=N)")
 	rootCmd.Flags().BoolVar(&settings.SafeFilenames, "safe-filenames", runtime.GOOS == "windows", "use filesystem-safe filenames (automatically enabled on Windows)")
 	rootCmd.Flags().StringVar(&sinceDate, "since", "", "only index media newer than this date (YYYY-MM-DD)")
 	rootCmd.Flags().StringVar(&settings.Sort, "sort", "", "sort output (newest, oldest, name, random)")
@@ -132,6 +140,9 @@ func run(s *config.Settings) error {
 	if s.Mode == "" && !s.Download && !s.DownloadSubtitles && s.ImportDir == "" {
 		return fmt.Errorf("please use --mode or --download")
 	}
+	if err := output.ValidateMode(s.Mode); err != nil {
+		return err
+	}
 
 	if s.Update {
 		s.Append = true
@@ -175,6 +186,9 @@ func run(s *config.Settings) error {
 	}
 
 	// Convert MiB to bytes for disk space calculations
+	if s.KeepFree < 0 || s.KeepFree > math.MaxInt64/(1024*1024) {
+		return fmt.Errorf("invalid --free value %d: must be between 0 and %d MiB", s.KeepFree, int64(math.MaxInt64/(1024*1024)))
+	}
 	s.KeepFree *= 1024 * 1024
 
 	if s.WorkDir == "" {
@@ -184,99 +198,5 @@ func run(s *config.Settings) error {
 		s.SubDir = "jwb-" + s.Lang
 	}
 
-	data, err := client.ParseBroadcasting()
-	if err != nil {
-		return err
-	}
-
-	// Offline import: scan the import directory for media files and add them to the data
-	if s.ImportDir != "" {
-		importedData, err := importOfflineMedia(s)
-		if err != nil {
-			return fmt.Errorf("offline import failed: %v", err)
-		}
-		data = append(data, importedData...)
-	}
-
-	if s.Download || s.DownloadSubtitles {
-		if err := downloader.DownloadAll(s, data); err != nil {
-			return err
-		}
-	}
-
-	if s.Mode != "" {
-		if err := output.CreateOutput(s, data); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// importOfflineMedia scans the import directory for media files and returns
-// them as categories that can be processed by the output/download pipeline.
-func importOfflineMedia(s *config.Settings) ([]*api.Category, error) {
-	entries, err := os.ReadDir(s.ImportDir)
-	if err != nil {
-		return nil, fmt.Errorf("could not read import directory: %w", err)
-	}
-
-	cat := &api.Category{
-		Key:  "imported",
-		Name: "Imported Media",
-		Home: true,
-	}
-
-	mediaExts := map[string]bool{
-		".mp4": true, ".mp3": true, ".m4a": true,
-		".aac": true, ".ogg": true, ".wav": true,
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if !mediaExts[ext] {
-			continue
-		}
-
-		fullPath, err := filepath.Abs(filepath.Join(s.ImportDir, entry.Name()))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not resolve path for %s: %v\n", entry.Name(), err)
-			continue
-		}
-
-		info, err := entry.Info()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not get file info for %s: %v\n", entry.Name(), err)
-			continue
-		}
-
-		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-
-		media := &api.Media{
-			URL:      fullPath,
-			Name:     name,
-			Filename: entry.Name(),
-			Size:     info.Size(),
-			Date:     info.ModTime().Unix(),
-		}
-
-		// FriendlyName is used as the symlink name in filesystem mode, so it
-		// must always be set, not only when --friendly is enabled.
-		media.FriendlyName = entry.Name()
-
-		cat.Contents = append(cat.Contents, media)
-	}
-
-	if len(cat.Contents) == 0 {
-		return nil, nil
-	}
-
-	if s.Quiet < 1 {
-		fmt.Fprintf(os.Stderr, "imported %d files from %s\n", len(cat.Contents), s.ImportDir)
-	}
-
-	return []*api.Category{cat}, nil
+	return cli.Process(s, client.ParseBroadcasting)
 }

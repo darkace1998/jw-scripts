@@ -3,8 +3,10 @@ package player
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
 )
@@ -273,5 +275,46 @@ func TestStop(t *testing.T) {
 		// expected
 	default:
 		t.Error("expected context to be canceled after Stop")
+	}
+}
+
+func TestPlayVideoInterruptedKeepsPosition(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not available")
+	}
+	dir := t.TempDir()
+	video := filepath.Join(dir, "a.mp4")
+	if err := os.WriteFile(video, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	vm := NewVideoManager(&config.Settings{WorkDir: dir, Quiet: 2})
+	// The video path is appended as $0 of the shell script; exec makes the
+	// killed player process the sleep itself, so nothing is left running
+	vm.SetCmd([]string{"sh", "-c", "exec sleep 30"})
+	vm.SetReplay(0)
+	vm.video = video
+	vm.pos = 120
+
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		vm.Stop()
+	}()
+	start := time.Now()
+	if err := vm.playVideo(); err != nil {
+		t.Fatalf("playVideo() returned error: %v", err)
+	}
+	if time.Since(start) > 10*time.Second {
+		t.Fatal("player was not stopped")
+	}
+	if vm.video != video || len(vm.history) != 0 {
+		t.Errorf("interrupted video should stay current and not enter history: video=%q history=%v", vm.video, vm.history)
+	}
+
+	restored := NewVideoManager(&config.Settings{WorkDir: dir, Quiet: 2})
+	if err := restored.readDump(); err != nil {
+		t.Fatal(err)
+	}
+	if restored.video != video || restored.pos < 120 {
+		t.Errorf("dump = %q at %d, want %q at >= 120", restored.video, restored.pos, video)
 	}
 }

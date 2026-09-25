@@ -60,29 +60,36 @@ func (m *VideoManager) SetReplay(replay int) {
 	m.replay = replay
 }
 
-// Run starts the video player loop.
+// Run starts the video player loop. On SIGINT or SIGTERM the running player
+// is stopped and the current position is saved so playback resumes there.
 func (m *VideoManager) Run() error {
 	if err := m.readDump(); err != nil {
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "could not read dump file: %v\n", err)
 		}
 	}
+	// A video from the dump file may have been deleted since
+	if m.video != "" {
+		if _, err := os.Stat(m.video); err != nil {
+			m.video = ""
+			m.pos = 0
+		}
+	}
 
-	// Set up signal handling for graceful shutdown
+	// The signal handler only cancels the context; all state is owned by
+	// this goroutine, which saves it once the player has stopped.
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer func() {
-		signal.Stop(sigChan)
-		close(sigChan)
-	}()
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+	defer m.cancel()
 
 	go func() {
-		<-sigChan
-		fmt.Fprintln(os.Stderr, "\nReceived shutdown signal, saving state...")
-		if err := m.writeDump(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to save state: %v\n", err)
+		select {
+		case <-sigChan:
+			fmt.Fprintln(os.Stderr, "\nReceived shutdown signal, saving state...")
+			m.cancel()
+		case <-m.ctx.Done():
 		}
-		m.cancel()
 	}()
 
 	showMsg := true
@@ -205,15 +212,21 @@ func (m *VideoManager) playVideo() error {
 	}
 	cmdArgs = append(cmdArgs, m.video)
 
+	// The player is killed when the manager is stopped (e.g. on SIGTERM)
 	// #nosec G204 - Command is user-configurable via CLI flags for media player functionality
-	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	cmd := exec.CommandContext(m.ctx, cmdArgs[0], cmdArgs[1:]...)
 	if m.verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
 
 	m.startTime = time.Now()
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	if m.ctx.Err() != nil {
+		// Interrupted: keep the video unfinished and remember the position
+		return m.writeDump()
+	}
+	if err != nil {
 		// Don't treat player exit as a fatal error
 		fmt.Fprintf(os.Stderr, "video player error: %v\n", err)
 	}

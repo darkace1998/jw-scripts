@@ -1,15 +1,14 @@
 package books
 
 import (
-	"bytes"
 	"crypto/md5" // #nosec G501 - MD5 used for test checksums matching the API format
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/darkace1998/jw-scripts/internal/config"
@@ -93,17 +92,17 @@ func TestDownloadBookChecksumMismatchRemovesFile(t *testing.T) {
 	}
 }
 
-// PDF cannot carry embedded tags, so metadata falls back to a JSON sidecar.
-func TestDownloadBookWritesSidecarForUnsupportedFormat(t *testing.T) {
+func TestDownloadBookWritesNFO(t *testing.T) {
 	server := newTestServer(t, map[string]string{
 		"/pub.pdf": "pdf-bytes",
 	})
 
 	book := &Book{
-		ID:       "es25",
-		Title:    "Daily Text",
-		Language: "E",
-		Issue:    "202601",
+		ID:          "es26",
+		Title:       "Daily Text",
+		Description: "Examining the Scriptures Daily",
+		Language:    "E",
+		Issue:       "202601",
 		Files: []BookFile{
 			{Format: FormatPDF, URL: server.URL + "/pub.pdf", Filename: "pub.pdf", Title: "Daily Text 2026", Size: int64(len("pdf-bytes"))},
 		},
@@ -117,67 +116,58 @@ func TestDownloadBookWritesSidecarForUnsupportedFormat(t *testing.T) {
 	}
 
 	// #nosec G304 - path is constrained to t.TempDir() in this test
-	data, err := os.ReadFile(filepath.Join(dir, "pub.pdf.json"))
+	data, err := os.ReadFile(filepath.Join(dir, "pub.nfo"))
 	if err != nil {
-		t.Fatalf("expected metadata sidecar to be written: %v", err)
+		t.Fatalf("expected NFO file to be written: %v", err)
 	}
-
-	var meta map[string]interface{}
-	if err := json.Unmarshal(data, &meta); err != nil {
-		t.Fatalf("metadata sidecar is not valid JSON: %v", err)
-	}
-	for key, want := range map[string]string{
-		"title":       "Daily Text 2026",
-		"filename":    "pub.pdf",
-		"publication": "es25",
-		"issue":       "202601",
-		"format":      "pdf",
-		"language":    "E",
+	for _, want := range []string{
+		"<title>Daily Text 2026</title>",
+		"<plot>Examining the Scriptures Daily</plot>",
+		"<tag>es26</tag>",
+		"<tag>202601</tag>",
+		"<tag>pdf</tag>",
 	} {
-		if got, _ := meta[key].(string); got != want {
-			t.Errorf("metadata %s: expected %q, got %q", key, want, got)
+		if !strings.Contains(string(data), want) {
+			t.Errorf("NFO missing %s:\n%s", want, data)
 		}
+	}
+	// #nosec G304 - path is constrained to t.TempDir() in this test
+	if content, _ := os.ReadFile(filepath.Join(dir, "pub.pdf")); string(content) != "pdf-bytes" {
+		t.Errorf("downloaded file was modified: %q", content)
 	}
 }
 
-func TestDownloadBookEmbedsMetadataInMP3(t *testing.T) {
-	audio := "\xff\xfbAUDIO-DATA"
-	server := newTestServer(t, map[string]string{
-		"/track.mp3": audio,
-	})
-
+func TestDownloadBookSizeMismatchLeavesNoFile(t *testing.T) {
+	server := newTestServer(t, map[string]string{"/short.pdf": "short"})
 	book := &Book{
-		ID:       "sjjm",
-		Title:    "Sing Out Joyfully",
-		Language: "E",
-		Files: []BookFile{
-			{Format: FormatMP3, URL: server.URL + "/track.mp3", Filename: "track.mp3", Title: "Song 1", Size: int64(len(audio))},
-		},
+		Title: "Short",
+		Files: []BookFile{{Format: FormatPDF, URL: server.URL + "/short.pdf", Filename: "short.pdf", Size: 100}},
 	}
 
 	dir := t.TempDir()
-	d := NewDownloader(&config.Settings{Quiet: 2, WriteMetadata: true})
+	if err := NewDownloader(&config.Settings{Quiet: 2}).DownloadBook(book, FormatPDF, dir); err == nil {
+		t.Fatal("expected size mismatch error")
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 0 {
+		t.Errorf("expected no files after a failed download, got %v", entries)
+	}
+}
 
-	if err := d.DownloadBook(book, FormatMP3, dir); err != nil {
+func TestDownloadBookGeneratesSafeFilename(t *testing.T) {
+	server := newTestServer(t, map[string]string{"/": "data"})
+	book := &Book{
+		Title: `..\..\evil: title`,
+		Files: []BookFile{{Format: FormatPDF, URL: server.URL + "/", Filename: ""}},
+	}
+
+	dir := t.TempDir()
+	if err := NewDownloader(&config.Settings{Quiet: 2}).DownloadBook(book, FormatPDF, dir); err != nil {
 		t.Fatalf("DownloadBook() returned error: %v", err)
 	}
-
-	// #nosec G304 - path is constrained to t.TempDir() in this test
-	content, err := os.ReadFile(filepath.Join(dir, "track.mp3"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.HasPrefix(content, []byte("ID3")) {
-		t.Error("expected MP3 to start with an embedded ID3 tag")
-	}
-	if !bytes.Contains(content, []byte("Song 1")) {
-		t.Error("expected embedded file title in tag")
-	}
-	if !bytes.HasSuffix(content, []byte(audio)) {
-		t.Error("expected audio data to be preserved")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "track.mp3.json")); !os.IsNotExist(err) {
-		t.Error("did not expect a sidecar for a successfully embedded MP3")
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 || strings.ContainsAny(entries[0].Name(), `/\:`) {
+		t.Errorf("unexpected files: %v", entries)
 	}
 }
 
