@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
       go install -trimpath -ldflags="-s -w" github.com/aptible/supercronic@${SUPERCRONIC_VERSION} && \
     find /go/bin -type f -name supercronic -exec cp {} /out/supercronic \;
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates tzdata su-exec
 
